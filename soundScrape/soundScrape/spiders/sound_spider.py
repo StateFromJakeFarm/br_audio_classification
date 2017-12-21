@@ -6,6 +6,16 @@ from bs4 import BeautifulSoup
 class SoundSpider(scrapy.Spider):
     name = "sound"
 
+    start_urls = [
+        'http://soundbible.com/tags-chain.html',
+        'http://www.freesfx.co.uk/sfx/saw'
+    ]
+
+    allowed_domains = [
+        'soundbible.com',
+        'freesfx.co.uk'
+    ]
+
     sound_file_types = [
         'mp3',
         'wav'
@@ -30,14 +40,6 @@ class SoundSpider(scrapy.Spider):
             regex += '(.*\.' + extension + ')'
 
         return regex
-
-    def start_requests(self):
-        urls = [
-            'http://soundbible.com/tags-chain.html',
-            'http://www.freesfx.co.uk/sfx/saw'
-        ]
-        for url in urls:
-            yield scrapy.Request(url=url, callback = self.parse)
 
     def parse(self, response):
         soup = BeautifulSoup(response.body)
