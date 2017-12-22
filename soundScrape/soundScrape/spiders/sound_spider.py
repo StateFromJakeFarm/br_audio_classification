@@ -21,6 +21,7 @@ class SoundSpider(CrawlSpider):
     ]
 
     rules = (
+        # Follow "next page" links
     )
 
     sound_file_types = [
@@ -36,17 +37,33 @@ class SoundSpider(CrawlSpider):
         '.edu'
     ]
 
-    def build_regex_or(self, strings):
-        '''Return a regex that matches any strings in list'''
+    next_page_terms = [
+        'page',
+        'next page'
+    ]
+
+    def build_regex_or(self, strings, both_cases = False):
+        '''Return a regex that matches any strings in a given list'''
         if len(strings) <= 0:
             logging.error('Must specify at least one audio file type')
             exit(1)
 
         regex = ''
+        letter_re = re.compile('[A-Z]|[a-z]')
         for i, string in enumerate(strings):
+            string = re.escape(string)
+            if both_cases:
+                modified_string = ''
+                for char in string:
+                    if letter_re.match(char):
+                        modified_string += '[' + char.upper() + char.lower() + ']'
+                    else:
+                        modified_string += char
+                string = modified_string
+
             if i > 0:
                 regex += '|'
-            regex += '(.*\.' + string + ')'
+            regex += '(\.' + string + ')'
 
         return regex
 
@@ -60,7 +77,6 @@ class SoundSpider(CrawlSpider):
 
         return base_url
 
-
     def get_absolute_url(self, base_url, link):
         '''Return the absolute URL given base and [potentially] relative URL'''
         if base_url not in link:
@@ -73,9 +89,9 @@ class SoundSpider(CrawlSpider):
 
         return link
 
-
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
+        print(self.build_regex_or(self.next_page_terms))
         soup = BeautifulSoup(response.body, 'lxml')
 
         base_url = self.get_base_url(response.url)
