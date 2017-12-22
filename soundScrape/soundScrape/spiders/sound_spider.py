@@ -39,7 +39,8 @@ class SoundSpider(CrawlSpider):
 
     next_page_terms = [
         'page',
-        'next page'
+        'next page',
+        'p'
     ]
 
     def build_regex_or(self, strings, both_cases = False):
@@ -80,12 +81,13 @@ class SoundSpider(CrawlSpider):
     def get_absolute_url(self, base_url, link):
         '''Return the absolute URL given base and [potentially] relative URL'''
         if base_url not in link:
-            if base_url[-1] == '/' and link[0] == '/':
-                link = base_url[:-1] + link
-            elif base_url[-1] != '/' and link[0] != '/':
-                link = base_url + '/' + link
-            else:
-                link = base_url + link
+            if base_url[-1] == '/':
+                base_url = base_url.rstrip('/')
+
+            if link[0] not in ['?', '&', '/']:
+                link = '/' + link
+
+            link = base_url + link
 
         return link
 
