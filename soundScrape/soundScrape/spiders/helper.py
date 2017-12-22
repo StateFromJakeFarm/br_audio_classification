@@ -47,3 +47,14 @@ def get_absolute_url(base_url, link):
         link = base_url + link
 
     return link
+
+def get_GET_params(url):
+    params = {}
+    for param in url.split(['?', '&'])[1:]:
+        split_param = param.split('=')
+        if len(split_param) == 2:
+            params[ split_param[0] ] = split_param[1]
+        else:
+            params[ split_param[0] ] = ''
+
+    return params

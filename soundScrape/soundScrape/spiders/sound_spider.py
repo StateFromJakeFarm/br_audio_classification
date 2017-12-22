@@ -10,8 +10,6 @@ class SoundSpider(CrawlSpider):
     name = "sound"
 
     start_urls = [
-        'http://soundbible.com/tags-chain.html',
-        'http://www.freesfx.co.uk/sfx/saw',
         'http://www.soundsboom.com/saw'
     ]
 
@@ -39,7 +37,7 @@ class SoundSpider(CrawlSpider):
         '?p'
     ]
 
-    pages_visited = []
+    pages_visited = start_urls
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
@@ -54,7 +52,12 @@ class SoundSpider(CrawlSpider):
 
         # Follow all links to other pages for this search
         for a in soup.findAll('a', href = re.compile( build_regex_or(self.next_page_terms, both_cases = True) )):
-            link = get_absolute_url(base_url, a['href'])
+            link = a['href']
+            if link[0] == '?':
+                link = response.url.split('?')[0] + link
+            else:
+                link = get_absolute_url(base_url, link)
+
             if link not in self.pages_visited:
                 logging.info('Following next page: ' + link)
                 self.pages_visited.append(link)
