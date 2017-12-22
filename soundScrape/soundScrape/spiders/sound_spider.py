@@ -36,8 +36,10 @@ class SoundSpider(CrawlSpider):
     next_page_terms = [
         'page',
         'next page',
-        'p'
+        '?p'
     ]
+
+    pages_visited = []
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
@@ -45,22 +47,15 @@ class SoundSpider(CrawlSpider):
 
         base_url = get_base_url(self.base_url_types, response.url)
 
-        for a in soup.findAll('a', href = re.compile(build_regex_or(self.sound_file_types) )):
+        # Get all sound files on page
+        for a in soup.findAll('a', href = re.compile( build_regex_or(self.sound_file_types, file_extension = True) )):
             link = get_absolute_url(base_url, a['href'])
-            logging.info('Found sound file: ' + link)
+            logging.info('Found file: ' + link)
 
-    rules = [
-        # Follow "next page" links
-        Rule(
-            LxmlLinkExtractor(
-                allow         = build_regex_or(next_page_terms, both_cases = True),
-                tags          = 'a',
-                attrs         = 'href',
-                unique        = True,
-                process_value = parse
-            ),
-            follow = True
-        )
-    ]
-
-
+        # Follow all links to other pages for this search
+        for a in soup.findAll('a', href = re.compile( build_regex_or(self.next_page_terms, both_cases = True) )):
+            link = get_absolute_url(base_url, a['href'])
+            if link not in self.pages_visited:
+                logging.info('Following next page: ' + link)
+                self.pages_visited.append(link)
+                yield scrapy.Request(link, self.parse)

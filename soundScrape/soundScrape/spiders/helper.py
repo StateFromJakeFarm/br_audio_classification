@@ -1,6 +1,6 @@
 import re
 
-def build_regex_or(strings, both_cases = False):
+def build_regex_or(strings, file_extension = False, both_cases = False):
     '''Return a regex that matches any strings in a given list'''
     regex = ''
     letter_re = re.compile('[A-Z]|[a-z]')
@@ -17,7 +17,11 @@ def build_regex_or(strings, both_cases = False):
 
         if i > 0:
             regex += '|'
-        regex += '(\.' + string + ')'
+
+        regex += '('
+        if file_extension:
+            regex += '\.'
+        regex += string + ')'
 
     return regex
 
