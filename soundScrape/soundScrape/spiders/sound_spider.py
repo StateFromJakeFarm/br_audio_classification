@@ -10,6 +10,8 @@ class SoundSpider(CrawlSpider):
     name = "sound"
 
     start_urls = [
+        'http://soundbible.com/tags-chain.html',
+        'http://www.freesfx.co.uk/sfx/saw',
         'http://www.soundsboom.com/saw'
     ]
 
