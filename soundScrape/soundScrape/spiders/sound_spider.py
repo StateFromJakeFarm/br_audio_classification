@@ -42,7 +42,7 @@ class SoundSpider(scrapy.Spider):
         return regex
 
     def parse(self, response):
-        soup = BeautifulSoup(response.body)
+        soup = BeautifulSoup(response.body, 'lxml')
 
         # Heuristically guess the base URL
         base_url = ''
