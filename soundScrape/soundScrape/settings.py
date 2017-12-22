@@ -68,6 +68,11 @@ ROBOTSTXT_OBEY = True
 #    'soundScrape.pipelines.SoundscrapePipeline': 300,
 #}
 
+# Allow offsite links to be followed
+SPIDER_MIDDLEWARES = {
+    'scrapy.spidermiddlewares.offsite.OffsiteMiddleware': None
+}
+
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
 #AUTOTHROTTLE_ENABLED = True
