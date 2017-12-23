@@ -10,9 +10,9 @@ class SoundSpider(CrawlSpider):
     name = "sound"
 
     start_urls = [
-        'http://soundbible.com/tags-chain.html',
-        'http://www.freesfx.co.uk/sfx/saw',
-        'http://www.soundsboom.com/saw'
+        'http://soundbible.com',
+        'http://www.freesfx.co.uk',
+        'http://www.soundsboom.com'
     ]
 
     pages_visited = start_urls
@@ -56,13 +56,29 @@ class SoundSpider(CrawlSpider):
         'cut'
     ]
 
-    accept_threshold = 0.1
+    accept_threshold = 0.2
+
+    def find_search_form(self, response):
+        '''Return details of how this site handles its search bar'''
+        soup = BeautifulSoup(response.body, 'lxml')
+
+        for form in soup.findAll('form'):
+            print(form, '\n')
+
+        search_re = re.compile(build_regex_or('search', both_cases = True))
+
+        return 'lol'
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
         soup = BeautifulSoup(response.body, 'lxml')
 
         base_url = get_base_url(self.base_url_types, response.url)
+
+        # If this is the homepage, try to find search bar and submit more requests
+        if response.url == base_url:
+            search_info = self.find_search_form(response)
+            return
 
         # Get all sound files on page
         splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
