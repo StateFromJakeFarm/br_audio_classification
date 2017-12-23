@@ -15,9 +15,12 @@ class SoundSpider(CrawlSpider):
         'http://www.soundsboom.com/saw'
     ]
 
+    pages_visited = start_urls
+
     allowed_domains = [
         'soundbible.com',
-        'freesfx.co.uk'
+        'freesfx.co.uk',
+        'soundsboom.com'
     ]
 
     sound_file_types = [
@@ -39,7 +42,21 @@ class SoundSpider(CrawlSpider):
         '?p'
     ]
 
-    pages_visited = start_urls
+    link_split_chars = [
+        '\ ',
+        '\-',
+        '_',
+        '\.'
+    ]
+
+    search_terms = [
+        'saw',
+        'metal',
+        'chain',
+        'cut'
+    ]
+
+    accept_threshold = 0.1
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
@@ -48,9 +65,12 @@ class SoundSpider(CrawlSpider):
         base_url = get_base_url(self.base_url_types, response.url)
 
         # Get all sound files on page
+        splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
         for a in soup.findAll('a', href = re.compile( build_regex_or(self.sound_file_types, file_extension = True) )):
             link = get_absolute_url(base_url, a['href'])
-            logging.info('Found file: ' + link)
+            pct_match = contains_terms( self.search_terms, re.split(splitter_re, link) )[1]
+            if pct_match >= self.accept_threshold:
+                logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
 
         # Follow all links to other pages for this search
         for a in soup.findAll('a', href = re.compile( build_regex_or(self.next_page_terms, both_cases = True) )):

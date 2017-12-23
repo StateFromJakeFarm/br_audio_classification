@@ -1,4 +1,5 @@
 import re
+from nltk.stem.snowball import SnowballStemmer
 
 def build_regex_or(strings, file_extension = False, both_cases = False):
     '''Return a regex that matches any strings in a given list'''
@@ -20,10 +21,15 @@ def build_regex_or(strings, file_extension = False, both_cases = False):
 
         regex += '('
         if file_extension:
-            regex += '\.'
-        regex += string + ')'
+            regex += '\.' + string + '$)'
+        else:
+            regex += string + ')'
 
     return regex
+
+def is_file(file_extensions, string):
+    '''Return true if a string is a link or path to a known file type'''
+    return re.search( build_regex_or(file_extensions, file_extension = True), string) is not None
 
 def get_base_url(base_url_types, url):
     '''Return the base URL of a given URL by looking for a known URL type'''
@@ -49,6 +55,7 @@ def get_absolute_url(base_url, link):
     return link
 
 def get_GET_params(url):
+    '''Return dictionary of all GET parameters in a URL'''
     params = {}
     for param in url.split(['?', '&'])[1:]:
         split_param = param.split('=')
@@ -58,3 +65,18 @@ def get_GET_params(url):
             params[ split_param[0] ] = ''
 
     return params
+
+def contains_terms(terms, string):
+    '''
+    Return a 2-tuple containing the number and 
+    fraction of a string's words stemming from our search terms
+    '''
+    ret_tuple = [0, 0]
+    stemmer = SnowballStemmer('english')
+    for word in string:
+        if stemmer.stem(word) in terms:
+            ret_tuple[0] += 1
+
+    ret_tuple[1] = ret_tuple[0] / len(string) * 1.0
+
+    return tuple(ret_tuple)
