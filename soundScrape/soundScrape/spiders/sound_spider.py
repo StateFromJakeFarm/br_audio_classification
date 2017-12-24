@@ -66,15 +66,16 @@ class SoundSpider(CrawlSpider):
         '''If we find a search bar, submit requests for all of our search terms'''
         soup = BeautifulSoup(response.body, 'lxml')
 
-        # Look for the search bar input field
+        # Look for the search form
         search_re = re.compile('search', re.IGNORECASE)
         get_re    = re.compile('get', re.IGNORECASE)
-        submit_re = re.compile('submit', re.IGNORECASE)
+        search_info = {}
         for form in soup.find_all('form', method=get_re):
             if re.search(search_re, str(form)):
                 # Find the search bar text input
-                for input_field in form.findChildren('input', type!=submit_re):
-                    print(input_field)
+                for input_field in form.findChildren('input'):
+                    if input_field.has_attr('name'):
+                        print(input_field)
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
