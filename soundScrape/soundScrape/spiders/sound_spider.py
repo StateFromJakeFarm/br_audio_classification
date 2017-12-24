@@ -56,7 +56,7 @@ class SoundSpider(CrawlSpider):
         'cut'
     ]
 
-    accept_threshold = 0.2
+    accept_threshold = 0.1
 
     max_page = 100
 
@@ -93,7 +93,7 @@ class SoundSpider(CrawlSpider):
             logging.info('Found search bar for ' + response.url)
             # We found the search bar, format the search request and submit for each term
             for term in self.search_terms:
-                logging.info('Searching ' + response.url + ' for ' + term)
+                logging.info('Searching ' + response.url + ' for "' + term + '"')
                 url = get_absolute_url(response.url, action) + '?' + name + '=' + term
                 yield scrapy.Request(url=url, callback=self.parse)
         else:
