@@ -69,9 +69,9 @@ ROBOTSTXT_OBEY = False
 #}
 
 # Allow offsite links to be followed
-SPIDER_MIDDLEWARES = {
-    'scrapy.spidermiddlewares.offsite.OffsiteMiddleware': None
-}
+#SPIDER_MIDDLEWARES = {
+#    'scrapy.spidermiddlewares.offsite.OffsiteMiddleware': None
+#}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
@@ -93,3 +93,6 @@ SPIDER_MIDDLEWARES = {
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+# Set log level
+LOG_LEVEL = 'INFO'

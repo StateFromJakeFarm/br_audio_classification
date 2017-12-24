@@ -45,13 +45,14 @@ class SoundSpider(CrawlSpider):
     ]
 
     search_terms = [
-        'saw',
+        'bike lock',
+        'metal cutting',
         'metal',
-        'chain',
-        'cut'
+        'iron',
+        'lock'
     ]
 
-    accept_threshold = 0.1
+    accept_threshold = 0.01
 
     max_page = 100
 
@@ -122,7 +123,7 @@ class SoundSpider(CrawlSpider):
 
             # Make sure this link goes to another page for the same search
             if not re.search(digit_re, str(a.string)):
-                logging.info('Rejecting non-page link: ' + link)
+                logging.debug('Rejecting non-page link: ' + link)
                 continue
 
             if int(a.string) <= self.max_page and link not in self.pages_visited and not is_file(self.sound_file_types, link):
@@ -130,4 +131,4 @@ class SoundSpider(CrawlSpider):
                 self.pages_visited.append(link)
                 yield scrapy.Request(link, self.parse)
             else:
-                logging.info('Rejecting page link: ' + link)
+                logging.debug('Rejecting page link: ' + link)
