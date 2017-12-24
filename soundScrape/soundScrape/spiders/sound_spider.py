@@ -44,12 +44,12 @@ class SoundSpider(CrawlSpider):
     ]
 
     search_terms = [
-        'bike lock',
-        'metal cutting',
-        'metal',
-        'iron',
-        'lock'
+        'metal sawing',
+        'cutting metal',
+        'sawing chain'
     ]
+
+    found_files = []
 
     accept_threshold = 0.01
 
@@ -106,9 +106,13 @@ class SoundSpider(CrawlSpider):
         splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
         for a in soup.find_all('a', href=re.compile( build_regex_or(self.sound_file_types, file_extension=True) )):
             link = get_absolute_url(base_url, a['href'])
+            if link in self.found_files:
+                continue
+
             pct_match = contains_terms( self.search_terms, re.split(splitter_re, link.split('/')[-1]) )[1]
             if pct_match >= self.accept_threshold:
                 logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
+                self.found_files.append(link)
 
         # Follow all links to other pages for this search
         digit_re = re.compile('^[0-9]*$')
