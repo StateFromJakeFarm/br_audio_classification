@@ -58,6 +58,8 @@ class SoundSpider(CrawlSpider):
 
     accept_threshold = 0.2
 
+    max_page = 100
+
     def start_requests(self):
         for url in self.start_urls:
             yield scrapy.Request(url=url, callback=self.search_parse)
@@ -114,16 +116,23 @@ class SoundSpider(CrawlSpider):
                 logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
 
         # Follow all links to other pages for this search
+        digit_re = re.compile('^[0-9]*$')
         for a in soup.find_all('a', href = re.compile( build_regex_or(self.next_page_terms), re.IGNORECASE)):
+            # Format the link for a request
             link = a['href']
             if link[0] == '?':
                 link = response.url.split('?')[0] + link
             else:
                 link = get_absolute_url(base_url, link)
 
-            if link not in self.pages_visited and not is_file(self.sound_file_types, link):
-                logging.info('Following next page: ' + link)
+            # Make sure this link goes to another page for the same search
+            if not re.search(digit_re, str(a.string)):
+                logging.info('Regecting non-page link: ' + link)
+                continue
+
+            if int(a.string) <= self.max_page and link not in self.pages_visited and not is_file(self.sound_file_types, link):
+                logging.info('Following page link: ' + link)
                 self.pages_visited.append(link)
                 yield scrapy.Request(link, self.parse)
             else:
-                logging.info('Rejecting link ' + link)
+                logging.info('Rejecting page link: ' + link)
