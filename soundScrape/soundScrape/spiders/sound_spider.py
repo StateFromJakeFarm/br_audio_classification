@@ -64,6 +64,7 @@ class SoundSpider(CrawlSpider):
 
     def search_parse(self, response):
         '''If we find a search bar, submit requests for all of our search terms'''
+        logging.info('Looking for search bar on ' + response.url)
         soup = BeautifulSoup(response.body, 'lxml')
 
         # Look for the search form
@@ -87,12 +88,15 @@ class SoundSpider(CrawlSpider):
                         break
 
         if action and name:
+            logging.info('Found search bar for ' + response.url)
             # We found the search bar, format the search request and submit for each term
             for term in self.search_terms:
+                logging.info('Searching ' + response.url + ' for ' + term)
                 url = get_absolute_url(response.url, action) + '?' + name + '=' + term
                 yield scrapy.Request(url=url, callback=self.parse)
         else:
             # We failed to find search bar, resubmit original request to self.parse
+            logging.warning('Could not find search bar, resubmitting ' + response.url + ' for normal file scraping')
             yield scrapy.Request(url=response.url, callback=self.parse)
 
     def parse(self, response):
@@ -117,7 +121,9 @@ class SoundSpider(CrawlSpider):
             else:
                 link = get_absolute_url(base_url, link)
 
-            if link not in self.pages_visited:
+            if link not in self.pages_visited and not is_file(self.sound_file_types, link):
                 logging.info('Following next page: ' + link)
                 self.pages_visited.append(link)
                 yield scrapy.Request(link, self.parse)
+            else:
+                logging.info('Rejecting link ' + link)
