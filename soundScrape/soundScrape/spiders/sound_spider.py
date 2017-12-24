@@ -19,8 +19,7 @@ class SoundSpider(CrawlSpider):
     pages_visited = start_urls
 
     sound_file_types = [
-        'mp3',
-        'wav'
+        'mp3'
     ]
 
     base_url_types = [
