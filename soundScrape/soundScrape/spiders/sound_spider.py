@@ -127,7 +127,7 @@ class SoundSpider(CrawlSpider):
 
             # Make sure this link goes to another page for the same search
             if not re.search(digit_re, str(a.string)):
-                logging.info('Regecting non-page link: ' + link)
+                logging.info('Rejecting non-page link: ' + link)
                 continue
 
             if int(a.string) <= self.max_page and link not in self.pages_visited and not is_file(self.sound_file_types, link):
