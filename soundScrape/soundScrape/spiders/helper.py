@@ -1,20 +1,12 @@
 import re
 from nltk.stem.snowball import SnowballStemmer
 
-def build_regex_or(strings, file_extension = False, both_cases = False):
+def build_regex_or(strings, file_extension=False):
     '''Return a regex that matches any strings in a given list'''
     regex = ''
     letter_re = re.compile('[A-Z]|[a-z]')
     for i, string in enumerate(strings):
         string = re.escape(string)
-        if both_cases:
-            modified_string = ''
-            for char in string:
-                if letter_re.match(char):
-                    modified_string += '[' + char.upper() + char.lower() + ']'
-                else:
-                    modified_string += char
-            string = modified_string
 
         if i > 0:
             regex += '|'
@@ -29,7 +21,7 @@ def build_regex_or(strings, file_extension = False, both_cases = False):
 
 def is_file(file_extensions, string):
     '''Return true if a string is a link or path to a known file type'''
-    return re.search( build_regex_or(file_extensions, file_extension = True), string) is not None
+    return re.search( build_regex_or(file_extensions, file_extension=True), string ) is not None
 
 def get_base_url(base_url_types, url):
     '''Return the base URL of a given URL by looking for a known URL type'''

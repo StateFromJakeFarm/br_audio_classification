@@ -2,7 +2,7 @@ import scrapy
 import logging
 from .helper import *
 from bs4 import BeautifulSoup
-from scrapy.contrib.spiders import CrawlSpider, Rule
+from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 
 class SoundSpider(CrawlSpider):
@@ -58,16 +58,23 @@ class SoundSpider(CrawlSpider):
 
     accept_threshold = 0.2
 
-    def find_search_form(self, response):
-        '''Return details of how this site handles its search bar'''
+    def start_requests(self):
+        for url in self.start_urls:
+            yield scrapy.Request(url=url, callback=self.search_parse)
+
+    def search_parse(self, response):
+        '''If we find a search bar, submit requests for all of our search terms'''
         soup = BeautifulSoup(response.body, 'lxml')
 
-        for form in soup.findAll('form'):
-            print(form, '\n')
-
-        search_re = re.compile(build_regex_or('search', both_cases = True))
-
-        return 'lol'
+        # Look for the search bar input field
+        search_re = re.compile('search', re.IGNORECASE)
+        get_re    = re.compile('get', re.IGNORECASE)
+        submit_re = re.compile('submit', re.IGNORECASE)
+        for form in soup.find_all('form', method=get_re):
+            if re.search(search_re, str(form)):
+                # Find the search bar text input
+                for input_field in form.findChildren('input', type!=submit_re):
+                    print(input_field)
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
@@ -75,21 +82,16 @@ class SoundSpider(CrawlSpider):
 
         base_url = get_base_url(self.base_url_types, response.url)
 
-        # If this is the homepage, try to find search bar and submit more requests
-        if response.url == base_url:
-            search_info = self.find_search_form(response)
-            return
-
         # Get all sound files on page
         splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
-        for a in soup.findAll('a', href = re.compile( build_regex_or(self.sound_file_types, file_extension = True) )):
+        for a in soup.find_all('a', href=re.compile( build_regex_or(self.sound_file_types, file_extension=True) )):
             link = get_absolute_url(base_url, a['href'])
             pct_match = contains_terms( self.search_terms, re.split(splitter_re, link) )[1]
             if pct_match >= self.accept_threshold:
                 logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
 
         # Follow all links to other pages for this search
-        for a in soup.findAll('a', href = re.compile( build_regex_or(self.next_page_terms, both_cases = True) )):
+        for a in soup.find_all('a', href = re.compile( build_regex_or(self.next_page_terms), re.IGNORECASE)):
             link = a['href']
             if link[0] == '?':
                 link = response.url.split('?')[0] + link
