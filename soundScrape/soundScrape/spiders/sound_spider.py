@@ -12,16 +12,11 @@ class SoundSpider(CrawlSpider):
     start_urls = [
         'http://soundbible.com',
         'http://www.freesfx.co.uk',
-        'http://www.soundsboom.com'
+        'http://www.soundsboom.com',
+        'https://freesound.org/'
     ]
 
     pages_visited = start_urls
-
-    allowed_domains = [
-        'soundbible.com',
-        'freesfx.co.uk',
-        'soundsboom.com'
-    ]
 
     sound_file_types = [
         'mp3',
@@ -85,7 +80,7 @@ class SoundSpider(CrawlSpider):
                 for input_field in form.findChildren('input'):
                     # We want 'name' attribute because this is used as a GET parameter
                     if input_field.has_attr('name'):
-                        action = form['action']
+                        action = form['action'].rstrip('/')
                         name   = input_field['name']
                         break
 
@@ -111,7 +106,7 @@ class SoundSpider(CrawlSpider):
         splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
         for a in soup.find_all('a', href=re.compile( build_regex_or(self.sound_file_types, file_extension=True) )):
             link = get_absolute_url(base_url, a['href'])
-            pct_match = contains_terms( self.search_terms, re.split(splitter_re, link) )[1]
+            pct_match = contains_terms( self.search_terms, re.split(splitter_re, link.split('/')[-1]) )[1]
             if pct_match >= self.accept_threshold:
                 logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
 

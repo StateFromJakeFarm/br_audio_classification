@@ -1,4 +1,5 @@
 import re
+import enchant
 from nltk.stem.snowball import SnowballStemmer
 
 def build_regex_or(strings, file_extension=False):
@@ -60,15 +61,25 @@ def get_GET_params(url):
 
 def contains_terms(terms, string):
     '''
-    Return a 2-tuple containing the number and 
-    fraction of a string's words stemming from our search terms
+    Return a 2-tuple containing the number and fraction of a
+    string's words stemming from our search terms IF the string
+    contains real english words, else return fraction = 1.
     '''
     ret_tuple = [0, 0]
+    num_words = 0
+    checker = enchant.Dict('en_US')
+    digit_re = re.compile('^[0-9]*$')
     stemmer = SnowballStemmer('english')
     for word in string:
+        if not re.search(digit_re, word) and checker.check(word):
+            num_words += 1
         if stemmer.stem(word) in terms:
             ret_tuple[0] += 1
 
-    ret_tuple[1] = ret_tuple[0] / len(string) * 1.0
+    if num_words == 0:
+        # This is probably some unique identifier string, accept it
+        ret_tuple[1] = 1.0
+    else:
+        ret_tuple[1] = ret_tuple[0] / len(string) * 1.0
 
     return tuple(ret_tuple)
