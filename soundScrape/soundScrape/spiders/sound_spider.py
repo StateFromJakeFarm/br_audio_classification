@@ -70,12 +70,30 @@ class SoundSpider(CrawlSpider):
         search_re = re.compile('search', re.IGNORECASE)
         get_re    = re.compile('get', re.IGNORECASE)
         search_info = {}
+
+        action = None
+        name = None
         for form in soup.find_all('form', method=get_re):
+            if action and name:
+                break
+
             if re.search(search_re, str(form)):
                 # Find the search bar text input
                 for input_field in form.findChildren('input'):
+                    # We want 'name' attribute because this is used as a GET parameter
                     if input_field.has_attr('name'):
-                        print(input_field)
+                        action = form['action']
+                        name   = input_field['name']
+                        break
+
+        if action and name:
+            # We found the search bar, format the search request and submit for each term
+            for term in self.search_terms:
+                url = get_absolute_url(response.url, action) + '?' + name + '=' + term
+                yield scrapy.Request(url=url, callback=self.parse)
+        else:
+            # We failed to find search bar, resubmit original request to self.parse
+            yield scrapy.Request(url=response.url, callback=self.parse)
 
     def parse(self, response):
         '''Callback for each response generated to parse HTML for sound files of interest'''
