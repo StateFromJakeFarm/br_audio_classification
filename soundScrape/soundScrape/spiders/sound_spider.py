@@ -13,7 +13,7 @@ class SoundSpider(CrawlSpider):
         'http://soundbible.com',
         'http://www.freesfx.co.uk',
         'http://www.soundsboom.com',
-        'https://freesound.org/'
+        'https://freesound.org'
     ]
 
     pages_visited = start_urls
@@ -67,6 +67,7 @@ class SoundSpider(CrawlSpider):
         # Look for the search form
         search_re = re.compile('search', re.IGNORECASE)
         get_re    = re.compile('get', re.IGNORECASE)
+        submit_re = re.compile('submit', re.IGNORECASE)
         search_info = {}
 
         action = None
@@ -78,8 +79,8 @@ class SoundSpider(CrawlSpider):
             if re.search(search_re, str(form)):
                 # Find the search bar text input
                 for input_field in form.findChildren('input'):
-                    # We want 'name' attribute because this is used as a GET parameter
-                    if input_field.has_attr('name'):
+                    # We want 'name' attribute because this is used as a GET parameter (but ignore the submit button)
+                    if input_field.has_attr('name') and (not input_field.has_attr('type') or not re.search(submit_re, input_field['type'])):
                         action = form['action'].rstrip('/')
                         name   = input_field['name']
                         break
