@@ -8,12 +8,18 @@ from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
 
 class SoundSpider(CrawlSpider):
     '''Scrape sites for sound files'''
+    # Name of spider
     name = "sound"
 
+    # Where we start (from sheet)
     start_urls = []
+    # Where we've been (from sheet)
+    pages_visited = []
 
-    pages_visited = start_urls
+    # Terms each site will be searched for (from sheet)
+    search_terms = []
 
+    # Sound file extensions we'll look for
     sound_file_types = [
         'mp3'
     ]
@@ -26,12 +32,17 @@ class SoundSpider(CrawlSpider):
         '.edu'
     ]
 
+    # Terms we'll use to identify "next page" links
     next_page_terms = [
         'page',
         'next page',
         '?p'
     ]
 
+    # Largest "page" link we'll follow
+    max_page = 10
+
+    # Characters used to split names of sound files we find
     link_split_chars = [
         '\ ',
         '\-',
@@ -39,26 +50,26 @@ class SoundSpider(CrawlSpider):
         '\.'
     ]
 
-    search_terms = [
-        'metal sawing',
-        'cutting metal',
-        'sawing chain'
-    ]
-
     # Access the Google Sheet
     auth_json = 'soundScrape-58c9b8c5fc20.json'
     sheet_name = 'soundScrape Dashboard'
 
+    # Make sure we don't download duplicates
     found_files = []
 
-    accept_threshold = 0.01
-
-    max_page = 100
+    # Fraction of search terms present in name of file to be downloaded
+    accept_threshold = 0.10
 
     def start_requests(self):
-        # Grab our starting urls from the Google Sheet
+        # Grab our starting URLs from the Google Sheet
         my_sheet = sheet_obj(self.auth_json, self.sheet_name)
         self.start_urls = my_sheet.get_start_urls()
+        self.pages_visited = self.start_urls
+
+        # Grab our search terms from the Google Sheet
+        self.search_terms = my_sheet.get_search_terms()
+
+        # Send a request to begin parsing each start URL
         for url in self.start_urls:
             yield scrapy.Request(url=url, callback=self.search_parse)
 

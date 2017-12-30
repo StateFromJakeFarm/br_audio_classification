@@ -1,5 +1,6 @@
 import gspread
 import logging
+import re
 from oauth2client.service_account import ServiceAccountCredentials
 
 class sheet_obj:
@@ -17,7 +18,22 @@ class sheet_obj:
             return None
 
     def get_start_urls(self):
-        '''Return generator for all base URLs in the spreadsheet'''
+        '''Return list of all starting/base URLs'''
+        urls = []
         for i, url in enumerate(self.sheet.col_values(1)):
-            if url != '' and i > 0:
-                yield url
+            if i == 0:
+                continue
+
+            if url != '' and self.sheet.cell(i+1, 2).value != 'yes':
+                urls.append(url)
+
+        return urls
+
+    def get_search_terms(self):
+        '''Return list of all global search terms'''
+        terms = []
+        for i, term in enumerate(self.sheet.col_values(5)):
+            if term != '' and i > 0:
+                terms.append(term)
+
+        return terms
