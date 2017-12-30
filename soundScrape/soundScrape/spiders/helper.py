@@ -65,12 +65,12 @@ def contains_terms(terms, string):
     string's words stemming from our search terms IF the string
     contains real english words, else return fraction = 1.
     '''
-    terms = ' '.join(terms).split(' ')
+    stemmer = SnowballStemmer('english')
+    terms = [stemmer.stem(word.lower()) for word in ' '.join(terms).split(' ')]
     ret_tuple = [0, 0]
     num_words = 0
     checker = enchant.Dict('en_US')
     digit_re = re.compile('^[0-9]*$')
-    stemmer = SnowballStemmer('english')
     for word in string:
         if not re.search(digit_re, word) and checker.check(word):
             num_words += 1
