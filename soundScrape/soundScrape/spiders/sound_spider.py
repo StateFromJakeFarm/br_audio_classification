@@ -3,8 +3,7 @@ import logging
 from .helper import *
 from .gdrive import sheet_obj
 from bs4 import BeautifulSoup
-from scrapy.spiders import CrawlSpider, Rule
-from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
+from scrapy.spiders import CrawlSpider
 
 class SoundSpider(CrawlSpider):
     '''Scrape sites for sound files'''
@@ -61,8 +60,9 @@ class SoundSpider(CrawlSpider):
     accept_threshold = 0.10
 
     def start_requests(self):
-        # Grab our starting URLs from the Google Sheet
         my_sheet = sheet_obj(self.auth_json, self.sheet_name)
+
+        # Grab our starting URLs from the Google Sheet
         self.start_urls = my_sheet.get_start_urls()
         self.pages_visited = self.start_urls
 
