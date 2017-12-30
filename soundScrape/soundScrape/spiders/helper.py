@@ -78,9 +78,13 @@ def contains_terms(terms, string):
             ret_tuple[0] += 1
 
     if num_words == 0:
-        # This is probably some unique identifier string, accept it
+        # This is probably some unique identifier string, accept it for now
         ret_tuple[1] = 1.0
     else:
         ret_tuple[1] = ret_tuple[0] / len(string) * 1.0
 
     return tuple(ret_tuple)
+
+def get_extension(file_name):
+    '''Return the file extension (without leading period)'''
+    return file_name.split('.')[-1]

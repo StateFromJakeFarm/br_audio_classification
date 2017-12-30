@@ -110,7 +110,11 @@ class SoundSpider(CrawlSpider):
             if link in self.found_files:
                 continue
 
-            pct_match = contains_terms( self.search_terms, re.split(splitter_re, link.split('/')[-1]) )[1]
+            string = link.split('/')[-1]
+            if a.string:
+                string += ' ' + a.string
+
+            pct_match = contains_terms( self.search_terms, re.split(splitter_re, string) )[1]
             if pct_match >= self.accept_threshold:
                 logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
                 self.found_files.append(link)
