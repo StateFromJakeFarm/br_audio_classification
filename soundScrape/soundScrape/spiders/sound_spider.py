@@ -1,6 +1,7 @@
 import scrapy
 import logging
 from .helper import *
+from .gdrive import sheet_obj
 from bs4 import BeautifulSoup
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors.lxmlhtml import LxmlLinkExtractor
@@ -9,12 +10,7 @@ class SoundSpider(CrawlSpider):
     '''Scrape sites for sound files'''
     name = "sound"
 
-    start_urls = [
-        'http://soundbible.com',
-        'http://www.freesfx.co.uk',
-        'http://www.soundsboom.com',
-        'https://freesound.org'
-    ]
+    start_urls = []
 
     pages_visited = start_urls
 
@@ -49,6 +45,10 @@ class SoundSpider(CrawlSpider):
         'sawing chain'
     ]
 
+    # Access the Google Sheet
+    auth_json = 'soundScrape-58c9b8c5fc20.json'
+    sheet_name = 'soundScrape Dashboard'
+
     found_files = []
 
     accept_threshold = 0.01
@@ -56,8 +56,9 @@ class SoundSpider(CrawlSpider):
     max_page = 100
 
     def start_requests(self):
-        # Try to grab our urls from the google sheet
-
+        # Grab our starting urls from the Google Sheet
+        my_sheet = sheet_obj(self.auth_json, self.sheet_name)
+        self.start_urls = my_sheet.get_start_urls()
         for url in self.start_urls:
             yield scrapy.Request(url=url, callback=self.search_parse)
 
