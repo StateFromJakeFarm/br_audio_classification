@@ -56,6 +56,8 @@ class SoundSpider(CrawlSpider):
     max_page = 100
 
     def start_requests(self):
+        # Try to grab our urls from the google sheet
+
         for url in self.start_urls:
             yield scrapy.Request(url=url, callback=self.search_parse)
 
