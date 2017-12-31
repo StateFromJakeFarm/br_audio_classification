@@ -1,7 +1,10 @@
 import gspread
 import logging
 import re
+import os
 from oauth2client.service_account import ServiceAccountCredentials
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 class sheet_obj:
     def __init__(self, auth_json, sheet_name):
@@ -37,3 +40,45 @@ class sheet_obj:
                 terms.append(term)
 
         return terms
+
+class drive_obj:
+    def __init__(self, auth_json, folder_name):
+        '''Return a drive object corresponding to the folder with provided name'''
+        scope = 'https://www.googleapis.com/auth/drive.appdata'
+
+        self.folder_name = folder_name
+        self.drive = None
+        try:
+            gauth = GoogleAuth()
+            creds = ServiceAccountCredentials.from_json_keyfile_name(auth_json, scope)
+            self.drive = GoogleDrive(creds)
+        except:
+            logging.error('Unable to obtain reference to folder: ' + self.folder_name)
+            return None
+
+    def upload_file(self, local_path):
+        '''Upload a file to location within our drive folder'''
+        path, file_name = os.path.split(local_path)
+        metadata = {
+            'name': file_name,
+            'parents': self.folder_name
+        }
+
+        my_file = self.drive.CreateFile(metadata)
+        my_file.Upload()
+
+drive = drive_obj('/home/jakeh/soundScrape-d78c4b542d68.json', '18UqSr7-b4wtrQExDhVGswu6a_6Xcz5DS')
+drive.upload_file('/home/jakeh/test.py')
+
+
+
+
+
+
+
+
+
+
+
+
+

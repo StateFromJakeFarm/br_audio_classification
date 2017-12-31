@@ -49,14 +49,14 @@ class SoundSpider(CrawlSpider):
         '\.'
     ]
 
-    # Access the Google Sheet
-    auth_json = 'soundScrape-58c9b8c5fc20.json'
+    # Access Google Drive
+    auth_json = 'soundScrape-d78c4b542d68.json'
     sheet_name = 'soundScrape Dashboard'
 
     # Make sure we don't download duplicates
     found_files = []
 
-    # Fraction of search terms present in name of file to be downloaded
+    # Fraction of words in file name that need to match our search terms
     accept_threshold = 0.10
 
     def start_requests(self):
