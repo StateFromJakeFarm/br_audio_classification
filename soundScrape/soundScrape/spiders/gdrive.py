@@ -3,6 +3,8 @@ import logging
 import re
 import os
 from oauth2client.service_account import ServiceAccountCredentials
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 class sheet_obj:
     def __init__(self, auth_json, sheet_name):
@@ -40,10 +42,18 @@ class sheet_obj:
         return terms
 
 class drive_obj:
-    def __init__(self, auth_json, folder_name):
+    def __init__(self):
         '''Return a drive object corresponding to the folder with provided name'''
-        pass
+        self.folder_id = '18UqSr7-b4wtrQExDhVGswu6a_6Xcz5DS'
+        gauth = GoogleAuth()
+        self.drive = GoogleDrive(gauth)
 
     def upload_file(self, local_path):
         '''Upload a file to location within our drive folder'''
-        pass
+        folder, fname = os.path.split(local_path)
+        f = self.drive.CreateFile({
+            'title': fname,
+            'parents': [{'kind': 'drive#fileLink', 'id': self.folder_id}]
+        })
+        f.SetContentFile(local_path)
+        f.Upload()
