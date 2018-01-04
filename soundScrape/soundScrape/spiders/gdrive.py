@@ -44,16 +44,72 @@ class sheet_obj:
 class drive_obj:
     def __init__(self):
         '''Return a drive object corresponding to the folder with provided name'''
-        self.folder_id = '18UqSr7-b4wtrQExDhVGswu6a_6Xcz5DS'
-        gauth = GoogleAuth()
-        self.drive = GoogleDrive(gauth)
+        self.root_id = '18UqSr7-b4wtrQExDhVGswu6a_6Xcz5DS'
 
-    def upload_file(self, local_path):
+        # Authorize our server
+        self.gauth = GoogleAuth()
+        self.gauth.LoadCredentialsFile('saved_creds.txt')
+        if not self.gauth.credentials:
+            self.gauth.LocalWebserverAuth()
+        elif self.gauth.access_token_expired:
+            try:
+                self.gauth.Refresh()
+            except:
+                self.gauth.LocalWebserverAuth()
+        else:
+            self.gauth.Authorize()
+
+        self.gauth.SaveCredentialsFile('saved_creds.txt')
+
+        self.drive = GoogleDrive(self.gauth)
+
+    def upload_file(self, local_path, dest_folder):
         '''Upload a file to location within our drive folder'''
+        # Get the ID of the destination folder
+        folders = self.get_folders()
+        dest_id = ''
+        for folder in folders:
+            cur_name = folder[0]
+            cur_id   = folder[1]
+            if dest_folder == cur_name:
+                dest_id = cur_id
+                break
+
+        if dest_id == '':
+            logging.error('Could not find /soundScrape/%s' % dest_folder)
+            return 1
+
         folder, fname = os.path.split(local_path)
         f = self.drive.CreateFile({
             'title': fname,
-            'parents': [{'kind': 'drive#fileLink', 'id': self.folder_id}]
+            'parents': [{'kind': 'drive#fileLink', 'id': dest_id}]
         })
         f.SetContentFile(local_path)
+        try:
+            f.Upload()
+            return 0
+        except:
+            return 1
+
+    def create_folder(self, folder_name):
+        '''Create a folder in the root folder for this project and return its ID'''
+        f = self.drive.CreateFile({
+            'title': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [{'kind': 'drive#fileLink', 'id': self.root_id}]
+        })
         f.Upload()
+
+        return f['id']
+
+    def get_folders(self):
+        '''Return a list of all folders in the root directory'''
+        file_list = self.drive.ListFile({
+            'q': "'%s' in parents and trashed=false" % self.root_id
+        }).GetList()
+
+        folder_list = []
+        for f in file_list:
+            if f['mimeType'] == 'application/vnd.google-apps.folder':
+                folder_list.append( (f['title'], f['id']) )
+        return folder_list
