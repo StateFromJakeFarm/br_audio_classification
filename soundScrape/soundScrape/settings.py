@@ -65,9 +65,11 @@ ROBOTSTXT_OBEY = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'scrapy.pipelines.files.FilesPipeline': 1
+    'scrapy.contrib.pipeline.files.FilesPipeline': 1
 }
-FILES_STORE = '/home/jakeh/repos/research/soundScrape/found_files'
+FILES_STORE = 'gs://soundscrape-bucket/'
+GCS_PROJECT_ID = '874209703659'
+GOOGLE_APPLICATION_CREDENTIALS = '/home/jakeh/repos/research/soundScrape/soundScrape-d78c4b542d68.json'
 
 # Allow offsite links to be followed
 #SPIDER_MIDDLEWARES = {

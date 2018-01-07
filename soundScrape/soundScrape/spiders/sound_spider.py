@@ -131,7 +131,7 @@ class SoundSpider(CrawlSpider):
 
             pct_match = contains_terms( self.search_terms, re.split(splitter_re, string) )[1]
             if pct_match >= self.accept_threshold:
-                logging.info('Downloading file: ' + link + ' (' + str(pct_match*100) + '%)')
+                logging.info('Uploading file: ' + link + ' (' + str(pct_match*100) + '%)')
                 self.found_files.append(link)
                 yield SoundFile(title=link.split('.')[0], file_urls=[link])
 
