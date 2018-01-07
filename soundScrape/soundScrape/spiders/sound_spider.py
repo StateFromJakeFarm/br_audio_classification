@@ -1,5 +1,6 @@
 import scrapy
 import logging
+from soundScrape.items import SoundFile
 from .helper import *
 from .gdrive import sheet_obj
 from bs4 import BeautifulSoup
@@ -130,8 +131,9 @@ class SoundSpider(CrawlSpider):
 
             pct_match = contains_terms( self.search_terms, re.split(splitter_re, string) )[1]
             if pct_match >= self.accept_threshold:
-                logging.info('Found file: ' + link + ' (' + str(pct_match*100) + '%)')
+                logging.info('Downloading file: ' + link + ' (' + str(pct_match*100) + '%)')
                 self.found_files.append(link)
+                yield SoundFile(title=link.split('.')[0], file_urls=[link])
 
         # Follow all links to other pages for this search
         digit_re = re.compile('^[0-9]*$')

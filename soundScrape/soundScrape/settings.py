@@ -64,9 +64,10 @@ ROBOTSTXT_OBEY = False
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'soundScrape.pipelines.SoundscrapePipeline': 300,
-#}
+ITEM_PIPELINES = {
+    'scrapy.pipelines.files.FilesPipeline': 1
+}
+FILES_STORE = '/home/jakeh/repos/research/soundScrape/found_files'
 
 # Allow offsite links to be followed
 #SPIDER_MIDDLEWARES = {
