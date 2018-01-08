@@ -59,7 +59,7 @@ def get_GET_params(url):
 
     return params
 
-def contains_terms(terms, string):
+def contains_terms(terms, split_string):
     '''
     Return a 2-tuple containing the number and fraction of a
     string's words stemming from our search terms IF the string
@@ -70,17 +70,17 @@ def contains_terms(terms, string):
     num_words = 0
     checker = enchant.Dict('en_US')
     digit_re = re.compile('^[0-9]*$')
-    for word in string:
+    for word in split_string:
         if not re.search(digit_re, word) and checker.check(word):
             num_words += 1
         if stemmer.stem(word.lower()) in terms:
             ret_tuple[0] += 1
 
     if num_words == 0:
-        # This is probably some unique identifier string, accept it for now
-        ret_tuple[1] = 1.0
+        # This is probably some unique identifier string, return -1.0 to indicate
+        ret_tuple[1] = -1.0
     else:
-        ret_tuple[1] = ret_tuple[0] / len(string) * 1.0
+        ret_tuple[1] = ret_tuple[0] / len(split_string) * 1.0
 
     return tuple(ret_tuple)
 

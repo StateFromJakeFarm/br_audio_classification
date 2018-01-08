@@ -65,7 +65,7 @@ ROBOTSTXT_OBEY = False
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'scrapy.contrib.pipeline.files.FilesPipeline': 1
+    'scrapy.pipelines.files.FilesPipeline': 1
 }
 FILES_STORE = 'gs://soundscrape-bucket/'
 GCS_PROJECT_ID = '874209703659'

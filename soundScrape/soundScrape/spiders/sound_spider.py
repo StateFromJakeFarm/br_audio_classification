@@ -62,6 +62,10 @@ class SoundSpider(CrawlSpider):
     # Fraction of words in file name that need to match our search terms
     accept_threshold = 0.10
 
+    # Depth upwards in the DOM structure we will go when searching for the parent
+    # of an "<a>" tag with a unique identifier as its file link
+    max_DOM_depth = 2
+
     def start_requests(self):
         my_sheet = sheet_obj(self.auth_json, self.sheet_name)
 
@@ -111,12 +115,12 @@ class SoundSpider(CrawlSpider):
             logging.info('Found search bar for ' + response.url)
             # We found the search bar, format the search request and submit for each term
             for term in self.search_terms:
-                logging.info('Searching ' + response.url + ' for "' + term + '"')
                 url = get_absolute_url(response.url, action) + '?' + name + '=' + term
+                logging.info('Searching ' + response.url + ' for "' + term + '" (' + url + ')')
                 yield scrapy.Request(url=url, callback=self.parse)
         else:
             # We failed to find search bar, resubmit original request to self.parse
-            logging.warning('Could not find search bar, resubmitting ' + response.url + ' for normal file scraping')
+            logging.warning('Could not find search bar; resubmitting ' + response.url + ' to be scraped')
             yield scrapy.Request(url=response.url, callback=self.parse)
 
     def parse(self, response):
@@ -136,11 +140,47 @@ class SoundSpider(CrawlSpider):
             if a.string:
                 string += ' ' + a.string
 
-            pct_match = contains_terms( self.search_term_word_stems, re.split(splitter_re, string) )[1]
-            if pct_match >= self.accept_threshold:
-                logging.info('Uploading file: ' + link + ' (' + str(pct_match*100) + '%)')
-                self.found_files.append(link)
-                yield SoundFile(title=link.split('.')[0], file_urls=[link])
+            # Re-check the percentage matching only if we find a unique ID on first try
+            attempt = 0
+            retry = 1
+            split_string = re.split(splitter_re, string)
+            while attempt < retry:
+                pct_match = contains_terms(self.search_term_word_stems, split_string)[1]
+                if pct_match >= self.accept_threshold:
+                    logging.info('Uploading file: ' + link + ' (' + str(pct_match*100) + '%)')
+                    self.found_files.append(link)
+                    yield SoundFile(title=link.split('.')[0], file_urls=[link])
+                elif pct_match == -1.0 and retry == 1:
+                    # We probably found a numeric unique ID; search for sibling tags of same type with identifying text
+                    parent = a
+                    container_type = ''
+                    for hop in range(self.max_DOM_depth):
+                        parent = parent.parent
+                        if hop == 0:
+                            # The direct parent of the "<a>" tag is probably its container, so lets try to find
+                            # another one at same depth (ex: adjacent "<td>" tags, one with the file, other with
+                            # the file title
+                            container_type = parent.name
+
+                    # Check each child of parent at max DOM depth
+                    i = 0
+                    children = [child for child in parent.children]
+                    num_children = len(children)
+                    while i < num_children:
+                        child = children[i]
+                        if child.name == container_type:
+                            # This child has same container type as file link; check each of its children
+                            for grandchild in child.children:
+                                split_string = grandchild.get_text().split(' ')
+                                if contains_terms(self.search_term_word_stems, split_string)[1] not in [-1.0, 0.0]:
+                                    # Check this new matching text
+                                    retry = 2
+
+                                    # Break out of both loops
+                                    i = num_children
+                                    break
+                        i += 1
+                attempt += 1
 
         # Follow all links to other pages for this search
         digit_re = re.compile('^[0-9]*$')
