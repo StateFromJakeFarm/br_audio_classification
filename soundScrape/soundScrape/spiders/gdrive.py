@@ -27,6 +27,7 @@ class sheet_obj:
 
             if url != '' and self.sheet.cell(i+1, 2).value in ['x', 'X']:
                 urls.append(url)
+                self.sheet.update_cell(i+1, 2, '')
 
         return urls
 
