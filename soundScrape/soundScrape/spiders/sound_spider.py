@@ -5,6 +5,7 @@ from .helper import *
 from .gdrive import sheet_obj
 from bs4 import BeautifulSoup
 from scrapy.spiders import CrawlSpider
+from nltk.stem.snowball import SnowballStemmer
 
 class SoundSpider(CrawlSpider):
     '''Scrape sites for sound files'''
@@ -18,6 +19,7 @@ class SoundSpider(CrawlSpider):
 
     # Terms each site will be searched for (from sheet)
     search_terms = []
+    search_term_word_stems = []
 
     # Sound file extensions we'll look for
     sound_file_types = [
@@ -36,7 +38,7 @@ class SoundSpider(CrawlSpider):
     next_page_terms = [
         'page',
         'next page',
-        '?p'
+        'p'
     ]
 
     # Largest "page" link we'll follow
@@ -69,6 +71,11 @@ class SoundSpider(CrawlSpider):
 
         # Grab our search terms from the Google Sheet
         self.search_terms = my_sheet.get_search_terms()
+
+        # Get the distinct stems of each word in our search terms
+        stemmer = SnowballStemmer('english')
+        self.search_term_word_stems = list(set([stemmer.stem(word) for word in ' '.join(self.search_terms).split(' ')]))
+        logging.info('Stems of all words in search terms: ' + str(self.search_term_word_stems))
 
         # Send a request to begin parsing each start URL
         for url in self.start_urls:
@@ -129,7 +136,7 @@ class SoundSpider(CrawlSpider):
             if a.string:
                 string += ' ' + a.string
 
-            pct_match = contains_terms( self.search_terms, re.split(splitter_re, string) )[1]
+            pct_match = contains_terms( self.search_term_word_stems, re.split(splitter_re, string) )[1]
             if pct_match >= self.accept_threshold:
                 logging.info('Uploading file: ' + link + ' (' + str(pct_match*100) + '%)')
                 self.found_files.append(link)

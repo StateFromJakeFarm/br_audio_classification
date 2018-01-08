@@ -66,7 +66,6 @@ def contains_terms(terms, string):
     contains real english words, else return fraction = 1.
     '''
     stemmer = SnowballStemmer('english')
-    terms = [stemmer.stem(word.lower()) for word in ' '.join(terms).split(' ')]
     ret_tuple = [0, 0]
     num_words = 0
     checker = enchant.Dict('en_US')
