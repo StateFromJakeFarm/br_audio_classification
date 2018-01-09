@@ -3,7 +3,7 @@ import logging
 from soundScrape.items import SoundFile
 from .helper import *
 from .gdrive import sheet_obj
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from scrapy.spiders import CrawlSpider
 from nltk.stem.snowball import SnowballStemmer
 
@@ -171,6 +171,9 @@ class SoundSpider(CrawlSpider):
                         if child.name == container_type:
                             # This child has same container type as file link; check each of its children
                             for grandchild in child.children:
+                                if isinstance(grandchild, NavigableString):
+                                    continue
+
                                 split_string = grandchild.get_text().split(' ')
                                 if contains_terms(self.search_term_word_stems, split_string)[1] not in [-1.0, 0.0]:
                                     # Check this new matching text
