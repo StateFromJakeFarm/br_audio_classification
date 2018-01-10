@@ -34,8 +34,19 @@ class sheet_obj:
     def get_search_terms(self):
         '''Return list of all global search terms'''
         terms = []
-        for i, term in enumerate(self.sheet.col_values(5)):
+        for i, term in enumerate(self.sheet.col_values(4)):
             if term != '' and i > 0:
                 terms.append(term)
 
         return terms
+
+    def get_accept_threshold(self):
+        '''Return the accept threshold from Google Sheet or default if unable'''
+        default = 0.3
+
+        sheet_val = self.sheet.cell(2, 7).value
+        if sheet_val == "" or not re.search('^[0-9]*$', sheet_val) or int(sheet_val) > 100:
+            logging.warning('Invalid accept threshold: "' + sheet_val + '"; setting to ' + str(default))
+            return default
+
+        return int(sheet_val) / 100

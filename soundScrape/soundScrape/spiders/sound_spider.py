@@ -60,7 +60,7 @@ class SoundSpider(CrawlSpider):
     found_files = []
 
     # Fraction of words in file name that need to match our search terms
-    accept_threshold = 0.10
+    accept_threshold = 0.30
 
     # Depth upwards in the DOM structure we will go when searching for the parent
     # of an "<a>" tag with a unique identifier as its file link
@@ -72,6 +72,10 @@ class SoundSpider(CrawlSpider):
         # Grab our starting URLs from the Google Sheet
         self.start_urls = my_sheet.get_start_urls()
         self.pages_visited = self.start_urls
+
+        # Get the accept threshold
+        self.accept_threshold = my_sheet.get_accept_threshold()
+        logging.info('Accept threshold: ' + str(self.accept_threshold))
 
         # Grab our search terms from the Google Sheet
         self.search_terms = my_sheet.get_search_terms()
