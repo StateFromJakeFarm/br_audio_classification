@@ -45,8 +45,19 @@ class sheet_obj:
         default = 0.3
 
         sheet_val = self.sheet.cell(2, 7).value
-        if sheet_val == "" or not re.search('^[0-9]*$', sheet_val) or int(sheet_val) > 100:
+        if sheet_val == '' or not re.search('^[0-9]*$', sheet_val) or int(sheet_val) > 100:
             logging.warning('Invalid accept threshold: "' + sheet_val + '"; setting to ' + str(default))
             return default
 
         return int(sheet_val) / 100
+
+    def get_max_page(self):
+        '''Return the max page depth from Google Sheet or default if unable'''
+        default = 10
+
+        sheet_val = self.sheet.cell(3, 7).value
+        if sheet_val == '' or not re.search('^[0-9]*$', sheet_val):
+            logging.warning('Invalid max page: "' + sheet_val + '"; setting to ' + str(default))
+            return default
+
+        return int(sheet_val)

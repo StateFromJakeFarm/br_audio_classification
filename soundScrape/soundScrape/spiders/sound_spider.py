@@ -77,6 +77,10 @@ class SoundSpider(CrawlSpider):
         self.accept_threshold = my_sheet.get_accept_threshold()
         logging.info('Accept threshold: ' + str(self.accept_threshold))
 
+        # Get the max page depth
+        self.max_page = my_sheet.get_max_page()
+        logging.info('Max "next page" link: ' + str(self.max_page))
+
         # Grab our search terms from the Google Sheet
         self.search_terms = my_sheet.get_search_terms()
 
