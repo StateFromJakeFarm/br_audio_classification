@@ -56,9 +56,6 @@ class SoundSpider(CrawlSpider):
     auth_json = 'soundScrape-d78c4b542d68.json'
     sheet_name = 'soundScrape Dashboard'
 
-    # Make sure we don't download duplicates
-    found_files = []
-
     # Fraction of words in file name that need to match our search terms
     accept_threshold = 0.30
 
@@ -141,9 +138,6 @@ class SoundSpider(CrawlSpider):
         splitter_re = re.compile( '[' + ''.join(self.link_split_chars) + ']' )
         for a in soup.find_all('a', href=re.compile( build_regex_or(self.sound_file_types, file_extension=True) )):
             link = get_absolute_url(base_url, a['href'])
-            if link in self.found_files:
-                continue
-
             string = link.split('/')[-1]
             if a.string:
                 string += ' ' + a.string
@@ -155,8 +149,7 @@ class SoundSpider(CrawlSpider):
             while attempt < retry:
                 pct_match = contains_terms(self.search_term_word_stems, split_string)[1]
                 if pct_match >= self.accept_threshold:
-                    logging.info('Uploading file: ' + link + ' (' + str(pct_match*100) + '%)')
-                    self.found_files.append(link)
+                    logging.info('Scraping file: ' + link + ' (' + str(pct_match*100) + '%)')
                     yield SoundFile(title=link.split('.')[0], file_urls=[link])
                 elif pct_match == -1.0 and retry == 1:
                     # We probably found a numeric unique ID; search for sibling tags of same type with identifying text
