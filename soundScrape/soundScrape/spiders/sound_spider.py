@@ -21,6 +21,10 @@ class SoundSpider(CrawlSpider):
     search_terms = []
     search_term_word_stems = []
 
+    # Terms we want to avoid (from sheet)
+    avoid_terms = []
+    avoid_term_stems = []
+
     # Sound file extensions we'll look for
     sound_file_types = [
         'mp3'
@@ -81,10 +85,15 @@ class SoundSpider(CrawlSpider):
         # Grab our search terms from the Google Sheet
         self.search_terms = my_sheet.get_search_terms()
 
-        # Get the distinct stems of each word in our search terms
+        # Grab terms to avoid from the Google Sheet
+        self.avoid_terms = my_sheet.get_avoid_terms()
+
+        # Get the distinct stems of each word in our search and avoid terms
         stemmer = SnowballStemmer('english')
         self.search_term_word_stems = list(set([stemmer.stem(word) for word in ' '.join(self.search_terms).split(' ')]))
-        logging.info('Stems of all words in search terms: ' + str(self.search_term_word_stems))
+        self.avoid_term_stems = list(set([stemmer.stem(word) for word in ' '.join(self.avoid_terms).split(' ')]))
+        logging.info('Search term stems: ' + str(self.search_term_word_stems))
+        logging.info('Avoid term stems:  ' + str(self.avoid_term_stems))
 
         # Send a request to begin parsing each start URL
         for url in self.start_urls:
@@ -147,7 +156,7 @@ class SoundSpider(CrawlSpider):
             retry = 1
             split_string = re.split(splitter_re, string)
             while attempt < retry:
-                pct_match = contains_terms(self.search_term_word_stems, split_string)[1]
+                pct_match = contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)[1]
                 if pct_match >= self.accept_threshold:
                     logging.info('Scraping file: ' + link + ' (' + str(pct_match*100) + '%)')
                     yield SoundFile(title=link.split('.')[0], file_urls=[link])
@@ -176,7 +185,7 @@ class SoundSpider(CrawlSpider):
                                     continue
 
                                 split_string = grandchild.get_text().split(' ')
-                                if contains_terms(self.search_term_word_stems, split_string)[1] not in [-1.0, 0.0]:
+                                if contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)[1] not in [-1.0, 0.0]:
                                     # Check this new matching text
                                     retry = 2
 
