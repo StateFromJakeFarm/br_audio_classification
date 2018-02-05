@@ -27,7 +27,15 @@ class SoundSpider(CrawlSpider):
 
     # Sound file extensions we'll look for
     sound_file_types = [
-        'mp3'
+        'mp3',
+        'wav',
+        'au',
+        'aif',
+        'aiff',
+        'flac',
+        'wma',
+        'm4a',
+        'ogg'
     ]
 
     base_url_types = [
