@@ -13,15 +13,14 @@ from twisted.internet.defer import Deferred, DeferredList
 from scrapy.utils.python import to_bytes
 
 class SoundscrapePipeline(FilesPipeline):
-    url_hashes_to_matched_terms = {}
+    urls_to_matched_terms = {}
 
     def process_item(self, item, spider):
         # Keep track of terms matched for this hash
         info = self.spiderinfo
         requests = arg_to_iter(self.get_media_requests(item, info))
         url = requests[0].url
-        url_hash = hashlib.sha1(to_bytes(url)).hexdigest()
-        self.url_hashes_to_matched_terms[url_hash] = item.get('matched_terms')
+        self.urls_to_matched_terms[url] = item.get('matched_terms')
 
         # Copy-paste the request-submission code
         dlist = [self._process_request(r, info) for r in requests]
@@ -32,7 +31,7 @@ class SoundscrapePipeline(FilesPipeline):
         url = request.url
         ext = os.path.splitext(url)[1]
         url_hash = hashlib.sha1(to_bytes(url)).hexdigest()
-        matched_terms = self.url_hashes_to_matched_terms[url_hash]
+        matched_terms = self.urls_to_matched_terms[url]
 
         file_name = '%s_%s%s' % (
             '-'.join(matched_terms),
