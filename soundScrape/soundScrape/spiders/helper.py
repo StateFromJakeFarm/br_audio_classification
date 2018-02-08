@@ -61,33 +61,37 @@ def get_GET_params(url):
 
 def contains_terms(search_terms, avoid_terms, split_string):
     '''
-    Return a 2-tuple containing the number and fraction of a
-    string's words stemming from our search terms IF the string
-    contains real english words, else return fraction = 1.
+    Return a 2-tuple containing:
+    [0]: the fraction of a string's words stemming from our search terms IF the string
+         contains real english words, else return fraction = 1.
+    [1]: a list of the stems matching those of our distinct search and avoid terms
     '''
     stemmer = SnowballStemmer('english')
-    ret_tuple = [0, 0]
-    num_words = 0
+    ret_tuple = [0, []]
+    num_actual_words = 0
+    rank = 0
     checker = enchant.Dict('en_US')
     digit_re = re.compile('^[0-9]*$')
     for word in split_string:
         if not re.search(digit_re, word) and checker.check(word):
-            num_words += 1
+            num_actual_words += 1
 
             stem = stemmer.stem(word.lower())
             if stem in search_terms:
-                ret_tuple[0] += 1
+                rank += 1
+                ret_tuple[1].append(stem)
             elif stem in avoid_terms:
-                ret_tuple[0] -= 1
+                ret_tuple[1].append(stem)
+                rank -= 1
 
     # Ensure avoid_terms doesn't accidentally render a -1.0
-    ret_tuple[0] = max(0, ret_tuple[0])
+    rank = max(0, rank)
 
-    if num_words == 0:
+    if num_actual_words == 0:
         # This is probably some unique identifier string, return -1.0 to indicate
-        ret_tuple[1] = -1.0
+        ret_tuple[0] = -1.0
     else:
-        ret_tuple[1] = ret_tuple[0] / len(split_string) * 1.0
+        ret_tuple[0] = rank / len(split_string) * 1.0
 
     return tuple(ret_tuple)
 

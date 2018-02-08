@@ -9,6 +9,5 @@ import scrapy
 
 
 class SoundFile(scrapy.Item):
-    title     = scrapy.Field()
+    matched_terms = scrapy.Field()
     file_urls = scrapy.Field()
-    files     = scrapy.Field()

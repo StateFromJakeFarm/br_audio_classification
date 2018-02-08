@@ -79,7 +79,8 @@ class SoundSpider(CrawlSpider):
         my_sheet = sheet_obj(self.auth_json, self.sheet_name)
 
         # Grab our starting URLs from the Google Sheet
-        self.start_urls = my_sheet.get_start_urls()
+        #self.start_urls = my_sheet.get_start_urls()
+        self.start_urls = ['https://retired.sounddogs.com']
         self.pages_visited = self.start_urls
 
         # Get the accept threshold
@@ -164,10 +165,10 @@ class SoundSpider(CrawlSpider):
             retry = 1
             split_string = re.split(splitter_re, string)
             while attempt < retry:
-                pct_match = contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)[1]
+                pct_match, matched_terms = contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)
                 if pct_match >= self.accept_threshold:
                     logging.info('Scraping file: ' + link + ' (' + str(pct_match*100) + '%)')
-                    yield SoundFile(title=link.split('.')[0], file_urls=[link])
+                    yield SoundFile(matched_terms=matched_terms, file_urls=[link])
                 elif pct_match == -1.0 and retry == 1:
                     # We probably found a numeric unique ID; search for sibling tags of same type with identifying text
                     parent = a
@@ -193,7 +194,7 @@ class SoundSpider(CrawlSpider):
                                     continue
 
                                 split_string = grandchild.get_text().split(' ')
-                                if contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)[1] not in [-1.0, 0.0]:
+                                if contains_terms(self.search_term_word_stems, self.avoid_term_stems, split_string)[0] not in [-1.0, 0.0]:
                                     # Check this new matching text
                                     retry = 2
 
