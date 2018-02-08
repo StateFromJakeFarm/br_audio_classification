@@ -79,8 +79,7 @@ class SoundSpider(CrawlSpider):
         my_sheet = sheet_obj(self.auth_json, self.sheet_name)
 
         # Grab our starting URLs from the Google Sheet
-        #self.start_urls = my_sheet.get_start_urls()
-        self.start_urls = ['https://retired.sounddogs.com']
+        self.start_urls = my_sheet.get_start_urls()
         self.pages_visited = self.start_urls
 
         # Get the accept threshold

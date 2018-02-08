@@ -20,16 +20,16 @@ class SoundscrapePipeline(FilesPipeline):
         info = self.spiderinfo
         requests = arg_to_iter(self.get_media_requests(item, info))
         url = requests[0].url
-        self.url_hashes_to_matched_terms[ hashlib.sha1(to_bytes(url)) ] = item.get('matched_terms')
+        url_hash = hashlib.sha1(to_bytes(url)).hexdigest()
+        self.url_hashes_to_matched_terms[url_hash] = item.get('matched_terms')
 
         # Copy-paste the request-submission code
         dlist = [self._process_request(r, info) for r in requests]
-        dfd = DeferredList(dlist, consumeErrors=1)
+        dfd = DeferredList(dlist, consumeErrors=0)
         return dfd.addCallback(self.item_completed, item, info)
 
     def file_path(self, request, response=None, info=None):
         url = request.url
-
         ext = os.path.splitext(url)[1]
         url_hash = hashlib.sha1(to_bytes(url)).hexdigest()
         matched_terms = self.url_hashes_to_matched_terms[url_hash]
@@ -39,5 +39,4 @@ class SoundscrapePipeline(FilesPipeline):
             url_hash,
             ext)
 
-        print(file_name)
         return file_name
