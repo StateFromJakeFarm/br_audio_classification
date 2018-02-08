@@ -205,7 +205,8 @@ class SoundSpider(CrawlSpider):
 
         # Follow all links to other pages for this search
         digit_re = re.compile('^[0-9]*$')
-        for a in soup.find_all('a', href = re.compile( build_regex_or(self.next_page_terms), re.IGNORECASE)):
+        page_terms_regex = '[&?/][' + build_regex_or(self.next_page_terms) + ']'
+        for a in soup.find_all('a', href = re.compile(page_terms_regex, re.IGNORECASE)):
             # Format the link for a request
             link = a['href']
             if link[0] == '?':
