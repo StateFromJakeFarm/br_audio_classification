@@ -70,7 +70,7 @@ ITEM_PIPELINES = {
 }
 FILES_STORE = 'gs://soundscrape-bucket/'
 GCS_PROJECT_ID = '874209703659'
-GOOGLE_APPLICATION_CREDENTIALS = '/home/jakeh/repos/research/soundScrape/soundScrape-d78c4b542d68.json'
+GOOGLE_APPLICATION_CREDENTIALS = '/home/jakeh/repos/research/soundScrape-d78c4b542d68.json'
 
 # Allow offsite links to be followed
 #SPIDER_MIDDLEWARES = {
