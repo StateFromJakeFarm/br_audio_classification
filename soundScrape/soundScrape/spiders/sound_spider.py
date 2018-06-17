@@ -65,7 +65,7 @@ class SoundSpider(CrawlSpider):
     ]
 
     # Access Google Drive
-    auth_json = 'soundScrape-d78c4b542d68.json'
+    auth_json = '../soundScrape-d78c4b542d68.json'
     sheet_name = 'soundScrape Dashboard'
 
     # Fraction of words in file name that need to match our search terms
