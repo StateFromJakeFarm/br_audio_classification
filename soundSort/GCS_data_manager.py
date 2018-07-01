@@ -3,7 +3,7 @@ import os
 from google.cloud import storage
 from sys import stderr
 
-class DataManager(object):
+class GCS_data_manager(object):
     '''
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
@@ -14,10 +14,10 @@ class DataManager(object):
                 client = storage.Client.from_service_account_json(auth_json)
                 self.bucket = client.get_bucket(bucket)
             except:
-                print(file=stderr, 'Error: could not login to service account')
+                print('Error: could not login to service account', file=stderr)
                 exit(1)
         else:
-            print(file=stderr, 'Error: {} does not exist'.format(auth_json))
+            print('Error: {} does not exist'.format(auth_json), file=stderr)
             exit(1)
 
     def list(self):
@@ -26,9 +26,9 @@ class DataManager(object):
         '''
         return self.bucket.list_blobs()
 
-    def download(gcs_path, local_path):
+    def download(self, gcs_path, local_path):
         '''
         Download a file from bucket to local disk.
         '''
-        blob = bucket.blob(gcs_path)
+        blob = self.bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
