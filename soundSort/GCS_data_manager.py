@@ -2,6 +2,7 @@ import os
 
 from google.cloud import storage
 from sys import stderr
+from pydub import AudioSegment
 
 class GCS_data_manager(object):
     '''
@@ -32,3 +33,18 @@ class GCS_data_manager(object):
         '''
         blob = self.bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
+
+    def convert_wav(self, src_path, dest_path):
+        '''
+        Convert file at src_path to WAV format and save converted file at
+        dest_path.
+        '''
+        ext = src_path.split('.')[-1]
+        {
+            'mp3': AudioSegment.from_mp3(src_path)
+            'ogg': AudioSegment.from_ogg(src_path)
+            'flv': AudioSegment.from_flv(src_path)
+            'mp4': AudioSegment.from_mp4(src_path)
+            'wma': AudioSegment.from_wma(src_path)
+            'aac': AudioSegment.from_aac(src_path)
+        }.get(ext).export(dest_path, 'wav')
