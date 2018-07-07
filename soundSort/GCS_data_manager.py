@@ -1,4 +1,5 @@
 import os
+import logging
 
 from google.cloud import storage
 from sys import stderr
@@ -31,6 +32,8 @@ class GCS_data_manager(object):
         '''
         Download a file from bucket to local disk.
         '''
+        logging.info('Saving {} on from GCS bucket {} to {} locally'.format(gcs_path, self.bucket.name, local_path))
+
         blob = self.bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
 
@@ -39,12 +42,11 @@ class GCS_data_manager(object):
         Convert file at src_path to WAV format and save converted file at
         dest_path.
         '''
-        ext = src_path.split('.')[-1]
+        logging.info('Converting {} to {}'.format(src_path, dest_path))
+
+        ext = src_path.split('.')[-1].strip()
         {
-            'mp3': AudioSegment.from_mp3(src_path)
-            'ogg': AudioSegment.from_ogg(src_path)
-            'flv': AudioSegment.from_flv(src_path)
-            'mp4': AudioSegment.from_mp4(src_path)
-            'wma': AudioSegment.from_wma(src_path)
-            'aac': AudioSegment.from_aac(src_path)
-        }.get(ext).export(dest_path, 'wav')
+            'mp3': AudioSegment.from_mp3,
+            'ogg': AudioSegment.from_ogg,
+            'flv': AudioSegment.from_flv,
+        }.get(ext)(src_path).export(dest_path, 'wav')
