@@ -43,7 +43,8 @@ class SoundSpider(CrawlSpider):
         '.org',
         '.gov',
         '.co.uk',
-        '.edu'
+        '.edu',
+        '.net'
     ]
 
     # Terms we'll use to identify "next page" links
@@ -211,6 +212,8 @@ class SoundSpider(CrawlSpider):
             link = a['href']
             if link[0] == '?':
                 link = response.url.split('?')[0] + link
+            elif link[0] == '/':
+                link = base_url + link
             else:
                 link = get_absolute_url(base_url, link)
 
