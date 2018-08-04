@@ -14,7 +14,7 @@ from SoundSort_data_manager import SoundSort_data_manager
 data_dir = 'soundScrapeDumps'
 logging.basicConfig(level=logging.INFO)
 
-def get_sound_files(dm, storage_dir_path):
+def get_sound_files(storage_dir_path):
     storage_dir_path = storage_dir_path.strip('/')
 
     sound_file_paths = []
@@ -45,7 +45,7 @@ for blob in dm.list():
         os.remove(local_path)
 
 # Prep all data
-sound_file_paths = get_sound_files(dm, 'soundScrapeDumps')
+sound_file_paths = get_sound_files('soundScrapeDumps')
 dm.prep_data(sound_file_paths)
 
 # Helper functions
