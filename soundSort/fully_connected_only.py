@@ -33,6 +33,10 @@ def load_sound_files(file_paths):
 
 dm = SoundSort_data_manager('../soundScrape-d78c4b542d68.json', 'soundscrape-bucket')
 
+# Create data directory if it does not exist
+if not os.path.isdir(data_dir):
+    os.mkdir(data_dir)
+
 # Download all the data files we need
 cur_files = os.listdir(data_dir)
 for blob in dm.list():
