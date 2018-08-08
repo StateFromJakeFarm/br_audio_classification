@@ -1,5 +1,6 @@
 import os
 import librosa
+import logging
 import numpy as np
 import tensorflow as tf
 
@@ -50,3 +51,4 @@ sound_file_paths = get_sound_files('soundScrapeDumps')
 dm.prep_data(sound_file_paths, rnn=True, num_timesteps=num_timesteps)
 
 # Create model
+print(dm.data_x, dm.data_y)

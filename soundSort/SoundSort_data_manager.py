@@ -63,16 +63,16 @@ class SoundSort_data_manager(object):
         Extract features from file.
         '''
         try:
-            Y, sample_rate = librosa.load(file_path)
+            Y, sr = librosa.load(file_path)
             if rnn:
                 return librosa.feature.mfcc(y=Y, sr=sr, n_mfcc=cepstra)
             else:
                 stft = np.abs(librosa.stft(Y))
-                mfccs = np.mean(librosa.feature.mfcc(y=Y, sr=sample_rate, n_mfcc=40).T,axis=0)
-                chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
-                mel = np.mean(librosa.feature.melspectrogram(Y, sr=sample_rate).T,axis=0)
-                contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
-                tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(Y), sr=sample_rate).T,axis=0)
+                mfccs = np.mean(librosa.feature.mfcc(y=Y, sr=sr, n_mfcc=40).T,axis=0)
+                chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sr).T,axis=0)
+                mel = np.mean(librosa.feature.melspectrogram(Y, sr=sr).T,axis=0)
+                contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sr).T,axis=0)
+                tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(Y), sr=sr).T,axis=0)
 
                 return np.concatenate([mfccs, chroma, mel, contrast, tonnetz])
         except Exception as e:
@@ -85,18 +85,18 @@ class SoundSort_data_manager(object):
         during training.
         '''
         data = []
-        for file_path in sound_file_paths:
+        for i, file_path in enumerate(sound_file_paths):
             logging.info('Extracting features from {}'.format(file_path))
 
-            features = self.extract_features(file_path)
+            features = self.extract_features(file_path, rnn=rnn)
             if features.shape[0] == 0:
                 # Could not extract features
                 continue
 
             if rnn:
                 # Reshape data to be time-step major
-                ceptra = features[0].shape[0]
-                time_slots = features[1].shape[0]
+                ceptra = features.shape[0]
+                time_slots = features.shape[1]
 
                 features = features.reshape((time_slots, ceptra))
 
