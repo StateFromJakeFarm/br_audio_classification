@@ -29,7 +29,7 @@ def load_sound_files(file_paths):
 
     return raw_sounds
 
-dm = SoundSort_data_manager('../soundScrape-d78c4b542d68.json', 'soundscrape-bucket')
+dm = SoundSort_data_manager('../soundScrape-d78c4b542d68.json', 'soundscrape-bucket', rnn=True)
 
 # Create data directory if it does not exist
 if not os.path.isdir(data_dir):
@@ -48,11 +48,11 @@ for blob in dm.list():
 
 # Prep data
 sound_file_paths = get_sound_files('soundScrapeDumps')
-dm.prep_data(sound_file_paths, rnn=True, num_timesteps=num_timesteps)
+dm.prep_data(sound_file_paths, num_timesteps=num_timesteps)
 
 # Configure model
 steps = 1000
-batch_size = 50
+batch_size = 20
 cepstra = 26
 hidden_layer_size = 50
 
@@ -80,7 +80,7 @@ with tf.Session() as sess:
         train_data, train_labels = dm.next_batch(batch_size=batch_size)
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
-        if step % steps/10:
+        if step % (steps/10) == 0:
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
-            logging.info('predicted: {}  actual: {}'.format(pred, test_label))
+            logging.info('({}/{})  predicted: {}  actual: {}'.format(step, steps, pred, test_label))

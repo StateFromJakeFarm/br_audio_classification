@@ -13,10 +13,11 @@ class SoundSort_data_manager(object):
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, auth_json, bucket):
+    def __init__(self, auth_json, bucket, rnn=False):
         self.data_x = []
         self.data_y = []
         self.i = 0
+        self.rnn = rnn
 
         if os.path.isfile(auth_json):
             try:
@@ -58,13 +59,13 @@ class SoundSort_data_manager(object):
             'flv': AudioSegment.from_flv,
         }.get(ext)(src_path).export(dest_path, 'wav')
 
-    def extract_features(self, file_path, rnn=False, cepstra=26):
+    def extract_features(self, file_path, cepstra=26):
         '''
         Extract features from file.
         '''
         try:
             Y, sr = librosa.load(file_path)
-            if rnn:
+            if self.rnn:
                 return librosa.feature.mfcc(y=Y, sr=sr, n_mfcc=cepstra)
             else:
                 stft = np.abs(librosa.stft(Y))
@@ -79,7 +80,7 @@ class SoundSort_data_manager(object):
             logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
             return np.empty(0)
 
-    def prep_data(self, sound_file_paths, rnn=False, num_timesteps=30):
+    def prep_data(self, sound_file_paths, num_timesteps=30):
         '''
         Extract features from all files so they can be easily sliced into batches
         during training.
@@ -88,12 +89,12 @@ class SoundSort_data_manager(object):
         for file_path in sound_file_paths:
             logging.info('Extracting features from {}'.format(file_path))
 
-            features = self.extract_features(file_path, rnn=rnn)
+            features = self.extract_features(file_path)
             if features.shape[0] == 0:
                 # Could not extract features
                 continue
 
-            if rnn:
+            if self.rnn:
                 # Reshape data to be time-step major
                 ceptra = features.shape[0]
                 time_slots = features.shape[1]
@@ -131,5 +132,8 @@ class SoundSort_data_manager(object):
 
             if self.i >= len(batch_x):
                 self.i = 0
+
+        batch_x = np.array(batch_x)
+        batch_y = np.array(batch_y)
 
         return batch_x, batch_y
