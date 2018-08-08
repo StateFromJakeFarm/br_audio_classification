@@ -85,7 +85,7 @@ class SoundSort_data_manager(object):
         during training.
         '''
         data = []
-        for i, file_path in enumerate(sound_file_paths):
+        for file_path in sound_file_paths:
             logging.info('Extracting features from {}'.format(file_path))
 
             features = self.extract_features(file_path, rnn=rnn)

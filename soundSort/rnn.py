@@ -6,7 +6,7 @@ import tensorflow as tf
 
 from SoundSort_data_manager import SoundSort_data_manager
 
-# Configuration
+# Configure high-level params
 data_dir = 'soundScrapeDumps'
 num_timesteps = 100
 logging.basicConfig(level=logging.INFO)
@@ -50,5 +50,37 @@ for blob in dm.list():
 sound_file_paths = get_sound_files('soundScrapeDumps')
 dm.prep_data(sound_file_paths, rnn=True, num_timesteps=num_timesteps)
 
+# Configure model
+steps = 1000
+batch_size = 50
+cepstra = 26
+hidden_layer_size = 50
+
 # Create model
-print(dm.data_x, dm.data_y)
+rnn_cell = tf.contrib.rnn.BasicRNNCell(hidden_layer_size)
+
+inputs = tf.placeholder(tf.float32, shape=[None, num_timesteps, cepstra])
+labels = tf.placeholder(tf.float32, shape=[None, 1])
+outputs, _ = tf.nn.dynamic_rnn(rnn_cell, inputs, dtype=tf.float32)
+
+Wl = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01))
+last_rnn_output = outputs[:,-1,:]
+final_outputs = tf.matmul(last_rnn_output, Wl)
+
+cross_entropy = tf.abs(final_outputs - labels)
+train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
+
+prediction = tf.cast(final_outputs, tf.float32)
+
+init = tf.initialize_all_variables()
+with tf.Session() as sess:
+    sess.run(init)
+
+    for step in range(steps):
+        train_data, train_labels = dm.next_batch(batch_size=batch_size)
+        sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
+
+        if step % steps/10:
+            test_data, test_label = dm.next_batch(batch_size=1)
+            pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
+            logging.info('predicted: {}  actual: {}'.format(pred, test_label))
