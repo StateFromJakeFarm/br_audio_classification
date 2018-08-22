@@ -80,7 +80,7 @@ class SoundSort_data_manager(object):
             logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
             return np.empty(0)
 
-    def prep_data(self, sound_file_paths, num_timesteps=30):
+    def prep_data(self, sound_file_paths, num_timesteps=100):
         '''
         Extract features from all files so they can be easily sliced into batches
         during training.
@@ -104,6 +104,7 @@ class SoundSort_data_manager(object):
                 if time_slots < num_timesteps:
                     # Needs padding to reach num_timesteps
                     features = np.append(features, np.zeros((num_timesteps-time_slots, ceptra)))
+                    features = features.reshape((num_timesteps, ceptra))
                 elif time_slots > num_timesteps:
                     # Needs truncating
                     features = features[:num_timesteps]
@@ -111,11 +112,14 @@ class SoundSort_data_manager(object):
                 # Only flatten for regular feed-forward
                 features = features.flatten()
 
+            # Get search terms associated with this file by soundScrape
             matched_terms = os.path.split(file_path)[-1].split('_')[0].split('-')
+
+            # Add row to dataset
             data.append([features, [(1 if 'saw' in matched_terms else 0)]])
 
         # Shuffle rows
-        shuffle(data)
+        #shuffle(data)
         for row in data:
             self.data_x.append(row[0])
             self.data_y.append(row[1])

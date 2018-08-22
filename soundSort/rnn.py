@@ -59,11 +59,11 @@ hidden_layer_size = 50
 # Create model
 rnn_cell = tf.contrib.rnn.BasicRNNCell(hidden_layer_size)
 
-inputs = tf.placeholder(tf.float32, shape=[None, num_timesteps, cepstra])
-labels = tf.placeholder(tf.float32, shape=[None, 1])
+inputs = tf.placeholder(tf.float32, shape=[None, num_timesteps, cepstra], name='input_layer')
+labels = tf.placeholder(tf.float32, shape=[None, 1], name='labels')
 outputs, _ = tf.nn.dynamic_rnn(rnn_cell, inputs, dtype=tf.float32)
 
-Wl = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01))
+Wl = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01), name='fully-connected')
 last_rnn_output = outputs[:,-1,:]
 final_outputs = tf.matmul(last_rnn_output, Wl)
 
