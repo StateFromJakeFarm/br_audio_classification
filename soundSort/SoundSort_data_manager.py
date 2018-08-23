@@ -13,22 +13,33 @@ class SoundSort_data_manager(object):
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, auth_json, bucket, rnn=False):
+    def __init__(self, data_dir, auth_json, bucket, rnn=False):
+        self.data_dir = data_dir
         self.data_x = []
         self.data_y = []
         self.i = 0
         self.rnn = rnn
 
+        # Get authorization JSON
         if os.path.isfile(auth_json):
             try:
                 client = storage.Client.from_service_account_json(auth_json)
                 self.bucket = client.get_bucket(bucket)
             except:
-                print('Error: could not login to service account', file=stderr)
+                logging.error('Could not login to service account', file=stderr)
                 exit(1)
         else:
-            print('Error: {} does not exist'.format(auth_json), file=stderr)
+            logging.error('{} does not exist'.format(auth_json), file=stderr)
             exit(1)
+
+        # Create storage directory if it does not exist
+        if not os.path.isdir(self.data_dir):
+            try:
+                logging.info('Creating {}'.format(self.data_dir))
+                os.mkdir(self.data_dir)
+            except:
+                logging.error('Could not create {}'.format(self.data_dir))
+                exit(1)
 
     def list(self):
         '''
@@ -80,18 +91,45 @@ class SoundSort_data_manager(object):
             logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
             return np.empty(0)
 
-    def prep_data(self, sound_file_paths, num_timesteps=100):
+    def prep_data(self, num_timesteps=100):
         '''
         Extract features from all files so they can be easily sliced into batches
         during training.
         '''
+        # Determine which files within the bucket we already have downloaded and
+        # which we need to download now
+        logging.info('Getting list of local files')
+        local_files  = os.listdir(self.data_dir)
+        logging.info('Getting list of remote files')
+        remote_blobs = self.list()
+        for blob in remote_blobs:
+            remote_name_no_ext = blob.name.split('.')[0]
+            if remote_name_no_ext + '.wav' not in local_files:
+                # We don't have this file (or a WAV version of it)
+                local_path = self.data_dir + '/' + blob.name
+                dest_path  = self.data_dir + '/' + remote_name_no_ext + '.wav'
+
+                # Download from GCP storage
+                logging.info('Downloading {}'.format(blob.name))
+                self.download(blob.name, local_path)
+
+                if local_path.split('.')[-1] != 'wav':
+                    # File is not in WAV format, convert and delete original
+                    logging.info('Converting {} to WAV format'.format(blob.name))
+
+                    self.convert_wav(local_path, dest_path)
+                    os.remove(local_path)
+
+        # Perform feature extraction on all files
         data = []
-        for file_path in sound_file_paths:
+        for file_path in os.listdir(self.data_dir):
+            file_path = '{}/{}'.format(self.data_dir, file_path)
             logging.info('Extracting features from {}'.format(file_path))
 
             features = self.extract_features(file_path)
             if features.shape[0] == 0:
                 # Could not extract features
+                logging.warning('Failed to extract features from {}'.format(file_path))
                 continue
 
             if self.rnn:

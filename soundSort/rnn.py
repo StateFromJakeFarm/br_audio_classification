@@ -8,53 +8,20 @@ from SoundSort_data_manager import SoundSort_data_manager
 
 # Configure high-level params
 data_dir = 'soundScrapeDumps'
-num_timesteps = 200
+auth_json_path = '../soundScrape-d78c4b542d68.json'
+bucket_name = 'soundscrape-bucket'
 logging.basicConfig(level=logging.INFO)
 
-# Helper functions
-def get_sound_files(storage_dir_path):
-    storage_dir_path = storage_dir_path.strip('/')
-
-    sound_file_paths = []
-    for file_name in os.listdir(storage_dir_path):
-        sound_file_paths.append(storage_dir_path + '/' + file_name.split('/')[-1])
-
-    return sound_file_paths
-
-def load_sound_files(file_paths):
-    raw_sounds = []
-    for path in file_paths:
-        x, sr = librosa.load(path)
-        raw_sounds.append(x)
-
-    return raw_sounds
-
-dm = SoundSort_data_manager('../soundScrape-d78c4b542d68.json', 'soundscrape-bucket', rnn=True)
-
-# Create data directory if it does not exist
-if not os.path.isdir(data_dir):
-    os.mkdir(data_dir)
-
-# Download all the data files we need
-cur_files = os.listdir(data_dir)
-for blob in dm.list():
-    f_name_no_ext = blob.name.split('.')[0]
-    if f_name_no_ext + '.wav' not in cur_files:
-        local_path = data_dir + '/' + blob.name
-        dest_path = data_dir + '/' + f_name_no_ext + '.wav'
-        dm.download(blob.name, local_path)
-        dm.convert_wav(local_path, dest_path)
-        os.remove(local_path)
-
-# Prep data
-sound_file_paths = get_sound_files('soundScrapeDumps')
-dm.prep_data(sound_file_paths, num_timesteps=num_timesteps)
-
 # Configure model
+num_timesteps = 200
 steps = 1000
 batch_size = 20
 cepstra = 26
 hidden_layer_size = 50
+
+# Prep data
+dm = SoundSort_data_manager(data_dir, auth_json_path, bucket_name, rnn=True)
+dm.prep_data(num_timesteps=num_timesteps)
 
 # Create model
 rnn_cell = tf.contrib.rnn.BasicRNNCell(hidden_layer_size)
