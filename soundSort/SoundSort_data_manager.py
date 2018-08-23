@@ -119,7 +119,7 @@ class SoundSort_data_manager(object):
             data.append([features, [(1 if 'saw' in matched_terms else 0)]])
 
         # Shuffle rows
-        #shuffle(data)
+        shuffle(data)
         for row in data:
             self.data_x.append(row[0])
             self.data_y.append(row[1])

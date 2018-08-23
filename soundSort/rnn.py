@@ -8,7 +8,7 @@ from SoundSort_data_manager import SoundSort_data_manager
 
 # Configure high-level params
 data_dir = 'soundScrapeDumps'
-num_timesteps = 100
+num_timesteps = 200
 logging.basicConfig(level=logging.INFO)
 
 # Helper functions
@@ -61,11 +61,15 @@ rnn_cell = tf.contrib.rnn.BasicRNNCell(hidden_layer_size)
 
 inputs = tf.placeholder(tf.float32, shape=[None, num_timesteps, cepstra], name='input_layer')
 labels = tf.placeholder(tf.float32, shape=[None, 1], name='labels')
-outputs, _ = tf.nn.dynamic_rnn(rnn_cell, inputs, dtype=tf.float32)
+rnn_outputs, _ = tf.nn.dynamic_rnn(rnn_cell, inputs, dtype=tf.float32)
+last_rnn_output = rnn_outputs[:,-1,:]
 
-Wl = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01), name='fully-connected')
-last_rnn_output = outputs[:,-1,:]
-final_outputs = tf.matmul(last_rnn_output, Wl)
+W_1 = tf.Variable(tf.truncated_normal([hidden_layer_size, hidden_layer_size], mean=0, stddev=0.01), name='fully-connected_1')
+b_1 = tf.Variable(tf.truncated_normal([hidden_layer_size], mean=0, stddev=0.01), name='bias_1')
+h_1 = tf.nn.relu(tf.matmul(last_rnn_output, W_1) + b_1)
+
+W_2 = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01), name='fully-connected_2')
+final_outputs = tf.matmul(h_1, W_2)
 
 cross_entropy = tf.abs(final_outputs - labels)
 train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
