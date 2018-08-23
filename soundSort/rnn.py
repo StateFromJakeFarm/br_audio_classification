@@ -43,15 +43,19 @@ train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
 
 prediction = tf.cast(final_outputs, tf.float32)
 
-init = tf.initialize_all_variables()
+init = tf.global_variables_initializer()
+
+# Run model
 with tf.Session() as sess:
     sess.run(init)
 
     for step in range(steps):
+        # Train on next batch
         train_data, train_labels = dm.next_batch(batch_size=batch_size)
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
         if step % (steps/10) == 0:
+            # Test on next item in training set (not genuine testing set...)
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(step, steps, pred, test_label))
