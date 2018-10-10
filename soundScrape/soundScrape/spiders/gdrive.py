@@ -4,10 +4,11 @@ import re
 import os
 from oauth2client.service_account import ServiceAccountCredentials
 
-class sheet_obj:
+class SheetObj:
     def __init__(self, auth_json, sheet_name):
         '''Return a sheet object corresponding to sheet with provided name'''
-        scope = ['https://spreadsheets.google.com/feeds']
+        scope = ['https://spreadsheets.google.com/feeds',
+                 'https://www.googleapis.com/auth/drive']
 
         self.sheet = None
         try:

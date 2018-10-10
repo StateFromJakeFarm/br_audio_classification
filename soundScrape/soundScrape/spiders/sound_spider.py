@@ -2,7 +2,7 @@ import scrapy
 import logging
 from soundScrape.items import SoundFile
 from .helper import *
-from .gdrive import sheet_obj
+from .gdrive import SheetObj
 from bs4 import BeautifulSoup, NavigableString
 from scrapy.spiders import CrawlSpider
 from nltk.stem.snowball import SnowballStemmer
@@ -77,7 +77,7 @@ class SoundSpider(CrawlSpider):
     max_DOM_depth = 2
 
     def start_requests(self):
-        my_sheet = sheet_obj(self.auth_json, self.sheet_name)
+        my_sheet = SheetObj(self.auth_json, self.sheet_name)
 
         # Grab our starting URLs from the Google Sheet
         self.start_urls = my_sheet.get_start_urls()
