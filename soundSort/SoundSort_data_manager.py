@@ -26,10 +26,10 @@ class SoundSort_data_manager(object):
                 client = storage.Client.from_service_account_json(auth_json)
                 self.bucket = client.get_bucket(bucket)
             except:
-                logging.error('Could not login to service account', file=stderr)
+                logging.error('Could not login to service account')
                 exit(1)
         else:
-            logging.error('{} does not exist'.format(auth_json), file=stderr)
+            logging.error('{} does not exist'.format(auth_json))
             exit(1)
 
         # Create storage directory if it does not exist
