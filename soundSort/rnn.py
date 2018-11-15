@@ -9,7 +9,7 @@ from SoundSort_data_manager import SoundSort_data_manager
 data_dir = 'soundScrapeDumps'
 auth_json_path = '../soundScrape-d78c4b542d68.json'
 bucket_name = 'soundscrape-bucket'
-logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
 num_timesteps = 200
