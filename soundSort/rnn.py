@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import tensorflow as tf
 
-from SoundSort_data_manager import SoundSort_data_manager
+from SoundSortDataManager import SoundSortDataManager
 
 # Configure high-level params
 data_dir = 'soundScrapeDumps'
@@ -19,7 +19,7 @@ cepstra = 26
 hidden_layer_size = 50
 
 # Prep data
-dm = SoundSort_data_manager(data_dir, auth_json_path, bucket_name, rnn=True)
+dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, rnn=True)
 dm.prep_data(num_timesteps=num_timesteps)
 
 # Create model

@@ -8,7 +8,7 @@ from sys import stderr
 from pydub import AudioSegment
 from random import shuffle
 
-class SoundSort_data_manager(object):
+class SoundSortDataManager(object):
     '''
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.

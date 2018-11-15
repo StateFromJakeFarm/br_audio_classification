@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from matplotlib.pyplot import specgram
-from SoundSort_data_manager import SoundSort_data_manager
+from SoundSortDataManager import SoundSortDataManager
 
 # Configuration
 data_dir = 'soundScrapeDumps'
@@ -31,7 +31,7 @@ def load_sound_files(file_paths):
 
     return raw_sounds
 
-dm = SoundSort_data_manager(data_dir, '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket')
+dm = SoundSortDataManager(data_dir, '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket')
 
 # Create data directory if it does not exist
 if not os.path.isdir(data_dir):
