@@ -28,7 +28,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
 num_timesteps = 200
-epochs = 1000
+epochs = 100
 batch_size = 10
 cepstra = 26
 hidden_layer_size = 300
@@ -47,7 +47,7 @@ lstm_outputs, lstm_states = tf.nn.dynamic_rnn(lstm_cell, inputs, dtype=tf.float3
 # FC layers
 W_1 = variable_normal([hidden_layer_size, hidden_layer_size], 'W_1')
 b_1 = variable_normal([hidden_layer_size], 'b_1')
-h_1 = relu(tf.matmul(lstm_outputs[-1], W_1) + b_1)
+h_1 = relu(tf.matmul(lstm_outputs[:,-1], W_1) + b_1)
 
 W_2 = variable_normal([hidden_layer_size, hidden_layer_size], 'W_2')
 b_2 = variable_normal([hidden_layer_size], 'b_2')
@@ -58,8 +58,7 @@ b_3 = variable_normal([1], 'b_3')
 final_outputs = tf.nn.relu(tf.matmul(h_2, W_3) + b_3)
 
 # Define training step
-#cross_entropy = tf.losses.mean_squared_error(labels, final_outputs)
-cross_entropy = tf.abs(final_outputs - labels)
+cross_entropy = tf.losses.mean_squared_error(labels, final_outputs)
 train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
 
 # Define prediction
@@ -78,8 +77,8 @@ with tf.Session() as sess:
         # Feed batch into network
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
-        if epoch % (epoch/10) == 0:
+        if epoch % (epochs/10) == 0:
             # Run "test" on next element in training set
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
-            logging.info('({}/{})  predicted: {}  actual: {}'.format(epoch, epochs, pred, label))
+            logging.info('({}/{})  predicted: {}  actual: {}'.format(epoch, epochs, pred, test_label))
