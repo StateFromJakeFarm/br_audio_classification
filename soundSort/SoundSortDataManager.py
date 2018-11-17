@@ -122,7 +122,9 @@ class SoundSortDataManager(object):
 
         # Perform feature extraction on all files
         data = []
-        for file_path in os.listdir(self.data_dir):
+        for i, file_path in enumerate(os.listdir(self.data_dir)):
+            if i >= 5:
+                break
             file_path = '{}/{}'.format(self.data_dir, file_path)
             logging.info('Extracting features from {}'.format(file_path))
 
