@@ -12,7 +12,7 @@ def variable_normal(shape, name):
     Initialize a TF variable of a user-defined shape using a truncated normal
     distribution
     '''
-    return tf.Variable(tf.truncated_normal(shape, mean=0, stddev=0.1), name=name)
+    return tf.Variable(tf.truncated_normal(shape, mean=0, stddev=0.01), name=name)
 
 def placeholder(shape, name):
     '''
@@ -28,7 +28,7 @@ logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
 num_timesteps = 200
-epochs = 100
+epochs = 500
 batch_size = 10
 cepstra = 26
 hidden_layer_size = 300
