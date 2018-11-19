@@ -13,11 +13,12 @@ class SoundSortDataManager(object):
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, data_dir, auth_json, bucket, rnn=False):
+    def __init__(self, data_dir, auth_json, bucket, search_terms, rnn=False):
         self.data_dir = data_dir
         self.data_x = []
         self.data_y = []
         self.i = 0
+        self.search_terms = set(search_terms)
         self.rnn = rnn
 
         # Get authorization JSON
@@ -51,7 +52,7 @@ class SoundSortDataManager(object):
         '''
         Download a file from bucket to local disk.
         '''
-        logging.info('Saving {} on from GCS bucket {} to {} locally'.format(gcs_path, self.bucket.name, local_path))
+        logging.info('Saving {} from GCS bucket {} to {} locally'.format(gcs_path, self.bucket.name, local_path))
 
         blob = self.bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
@@ -151,10 +152,10 @@ class SoundSortDataManager(object):
                 features = features.flatten()
 
             # Get search terms associated with this file by soundScrape
-            matched_terms = os.path.split(file_path)[-1].split('_')[0].split('-')
+            matched_terms = set(os.path.split(file_path)[-1].split('_')[0].split('-'))
 
             # Add row to dataset
-            data.append([features, [(1 if 'saw' in matched_terms else 0)]])
+            data.append([features, [(1 if len(list(self.search_terms & matched_terms)) else 0)]])
 
         # Shuffle rows
         shuffle(data)

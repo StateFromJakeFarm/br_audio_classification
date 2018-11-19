@@ -19,7 +19,7 @@ cepstra = 26
 hidden_layer_size = 50
 
 # Prep data
-dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, rnn=True)
+dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, ['saw'], rnn=True)
 dm.prep_data(num_timesteps=num_timesteps)
 
 # Create model

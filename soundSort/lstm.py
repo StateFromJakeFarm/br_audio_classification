@@ -34,7 +34,7 @@ cepstra = 26
 hidden_layer_size = 300
 
 # Prep data
-dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, rnn=True)
+dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, ['saw', 'grinder', 'cut'], rnn=True)
 dm.prep_data(num_timesteps=num_timesteps)
 
 # LSTM layer

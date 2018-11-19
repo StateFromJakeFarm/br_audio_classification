@@ -31,7 +31,7 @@ def load_sound_files(file_paths):
 
     return raw_sounds
 
-dm = SoundSortDataManager(data_dir, '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket')
+dm = SoundSortDataManager(data_dir, '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket', ['saw'])
 
 # Create data directory if it does not exist
 if not os.path.isdir(data_dir):
