@@ -48,13 +48,19 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     sess.run(init)
 
+    # Create a saver to save snapshots of our model during training
+    saver = tf.train.Saver()
+
     for step in range(steps):
         # Train on next batch
         train_data, train_labels = dm.next_batch(batch_size=batch_size)
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
-        if step % (steps/10) == 0:
+        if step > 0 and step % (steps/10) == 0:
             # Test on next item in training set (not genuine testing set...)
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(step, steps, pred, test_label))
+
+            # Save snapshot of model
+            saver.save(sess, './rnn', global_step=step)
