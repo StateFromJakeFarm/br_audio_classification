@@ -92,7 +92,7 @@ class SoundSortDataManager(object):
             logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
             return np.empty(0)
 
-    def prep_data(self, num_timesteps=100):
+    def prep_data(self, num_files=None, num_timesteps=100):
         '''
         Extract features from all files so they can be easily sliced into batches
         during training.
@@ -123,7 +123,11 @@ class SoundSortDataManager(object):
 
         # Perform feature extraction on all files
         data = []
-        for file_path in os.listdir(self.data_dir):
+        for i, file_path in enumerate(os.listdir(self.data_dir)):
+            if num_files and i >= num_files:
+                # We've prepped all the files the user wanted
+                break
+
             file_path = '{}/{}'.format(self.data_dir, file_path)
             logging.info('Extracting features from {}'.format(file_path))
 
@@ -173,7 +177,9 @@ class SoundSortDataManager(object):
             batch_x.append(self.data_x[self.i])
             batch_y.append(self.data_y[self.i])
 
-            if self.i >= len(batch_x):
+            # Move to next file
+            self.i += 1
+            if self.i >= len(self.data_x):
                 self.i = 0
 
         batch_x = np.array(batch_x)

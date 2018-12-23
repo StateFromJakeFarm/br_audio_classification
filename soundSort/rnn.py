@@ -1,14 +1,17 @@
 import os
+import sys
 import logging
 import numpy as np
 import tensorflow as tf
 
+from tensorflow.python.saved_model import tag_constants
 from SoundSortDataManager import SoundSortDataManager
 
 # Configure high-level params
 data_dir = 'soundScrapeDumps'
 auth_json_path = '../soundScrape-d78c4b542d68.json'
 bucket_name = 'soundscrape-bucket'
+save_dir = 'rnn_save'
 logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
@@ -44,23 +47,34 @@ prediction = tf.cast(final_outputs, tf.float32)
 
 init = tf.global_variables_initializer()
 
+if len(sys.argv) == 1:
+    # Save model if no load directory specified
+    builder = tf.saved_model.builder.SavedModelBuilder(save_dir)
+
 # Run model
 with tf.Session() as sess:
     sess.run(init)
 
-    # Create a saver to save snapshots of our model during training
-    saver = tf.train.Saver()
+    if len(sys.argv) == 2:
+        # Load save
+        logging.info('Loading saved network at: {}'.format(sys.argv[1]))
+        tf.saved_model.loader.load(sess, [tag_constants.TRAINING], sys.argv[1])
+
+    if len(sys.argv) == 1:
+        builder.add_meta_graph_and_variables(sess, [tag_constants.TRAINING],
+            signature_def_map=None, assets_collection=None)
 
     for step in range(steps):
         # Train on next batch
         train_data, train_labels = dm.next_batch(batch_size=batch_size)
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
-        if step > 0 and step % (steps/10) == 0:
+        if step % (steps//10) == 0:
             # Test on next item in training set (not genuine testing set...)
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(step, steps, pred, test_label))
 
-            # Save snapshot of model
-            saver.save(sess, './rnn', global_step=step)
+if len(sys.argv) == 1:
+    # Save trained model
+    builder.save()
