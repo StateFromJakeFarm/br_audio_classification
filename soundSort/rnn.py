@@ -3,14 +3,19 @@ import sys
 import logging
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.saved_model import tag_constants
+from tensorflow.saved_model import simple_save
 from SoundSortDataManager import SoundSortDataManager
+
+# Ensure we have somewhere to save the network after training
+if len(sys.argv) != 2:
+    print('usage: python3 rnn.py <save dir>', file=sys.stderr)
+    exit(1)
+save_dir = sys.argv[1]
 
 # Configure high-level params
 data_dir = 'soundScrapeDumps'
 auth_json_path = '../soundScrape-d78c4b542d68.json'
 bucket_name = 'soundscrape-bucket'
-save_dir = 'rnn_save'
 logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
@@ -21,7 +26,7 @@ cepstra = 26
 hidden_layer_size = 50
 
 # Prep data
-dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, ['saw'], rnn=True)
+dm = SoundSortDataManager(data_dir, auth_json_path, bucket_name, ['saw', 'grinder'], rnn=True)
 dm.prep_data(num_timesteps=num_timesteps)
 
 # Create model
@@ -37,7 +42,7 @@ b_1 = tf.Variable(tf.truncated_normal([hidden_layer_size], mean=0, stddev=0.01),
 h_1 = tf.nn.relu(tf.matmul(last_rnn_output, W_1) + b_1)
 
 W_2 = tf.Variable(tf.truncated_normal([hidden_layer_size, 1], mean=0, stddev=0.01), name='fully-connected_2')
-final_outputs = tf.matmul(h_1, W_2)
+final_outputs = tf.matmul(h_1, W_2, name='outputs')
 
 cross_entropy = tf.abs(final_outputs - labels)
 train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
@@ -46,22 +51,10 @@ prediction = tf.cast(final_outputs, tf.float32)
 
 init = tf.global_variables_initializer()
 
-if len(sys.argv) == 1:
-    # Save model if no load directory specified
-    builder = tf.saved_model.builder.SavedModelBuilder(save_dir)
-
 # Run model
 with tf.Session() as sess:
+    # Initialize all variables
     sess.run(init)
-
-    if len(sys.argv) == 2:
-        # Load saved model
-        logging.info('Loading saved model at: {}'.format(sys.argv[1]))
-        tf.saved_model.loader.load(sess, [tag_constants.TRAINING], sys.argv[1])
-
-    if len(sys.argv) == 1:
-        builder.add_meta_graph_and_variables(sess, [tag_constants.TRAINING],
-            signature_def_map=None, assets_collection=None)
 
     for step in range(steps):
         # Train on next batch
@@ -74,6 +67,6 @@ with tf.Session() as sess:
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(step, steps, pred, test_label))
 
-if len(sys.argv) == 1:
-    # Save trained model
-    builder.save()
+    # Save model
+    simple_save(sess, save_dir, inputs={'input': inputs, 'label': labels},
+        outputs={'outputs': final_outputs})

@@ -1,10 +1,11 @@
 import os
+import sys
 import logging
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn_cell
 from tensorflow.nn import relu
-from tensorflow.python.saved_model import tag_constants
+from tensorflow.saved_model import simple_save
 from SoundSortDataManager import SoundSortDataManager
 
 def variable_normal(shape, name):
@@ -20,11 +21,16 @@ def placeholder(shape, name):
     '''
     return tf.placeholder(tf.float32, shape=shape, name=name)
 
+# Ensure we have somewhere to save the network after training
+if len(sys.argv) != 2:
+    print('usage: python3 lstm.py <save dir>', file=sys.stderr)
+    exit(1)
+save_dir = sys.argv[1]
+
 # High-level paramaters
 data_dir = 'soundScrapeDumps'
 auth_json_path = '../soundScrape-d78c4b542d68.json'
 bucket_name = 'soundscrape-bucket'
-save_dir = 'lstm_save'
 logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
@@ -56,7 +62,7 @@ h_2 = relu(tf.matmul(h_1, W_2) + b_1)
 
 W_3 = variable_normal([hidden_layer_size, 1], 'W_3')
 b_3 = variable_normal([1], 'b_3')
-final_outputs = tf.nn.relu(tf.matmul(h_2, W_3) + b_3)
+final_outputs = tf.nn.relu(tf.matmul(h_2, W_3) + b_3, name='outputs')
 
 # Define training step
 cross_entropy = tf.losses.mean_squared_error(labels, final_outputs)
@@ -65,24 +71,11 @@ train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
 # Define prediction
 prediction = tf.cast(final_outputs, tf.float32)
 
-if len(sys.argv) == 1:
-    # Save model if no load directory specified
-    builder = tf.saved_model.builder.SavedModelBuilder(save_dir)
-
 # Train model
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     # Initialize all variables
     sess.run(init)
-
-    if len(sys.argv) == 2:
-        # Load saved model
-        logging.info('Loading saved model at: {}'.format(sys.argv[1]))
-        tf.saved_model.loader.load(sess, [tag_constants.TRAINING], sys.argv[1])
-
-    if len(sys.argv) == 1:
-        builder.add_meta_graph_and_variables(sess, [tag_constants.TRAINING],
-            signature_def_map=None, assets_collection=None)
 
     for epoch in range(epochs):
         # Grab next batch
@@ -97,6 +90,6 @@ with tf.Session() as sess:
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(epoch, epochs, pred, test_label))
 
-if len(sys.argv) == 1:
-    # Save trained model
-    builder.save()
+    # Save model
+    simple_save(sess, save_dir, inputs={'inputs': inputs, 'labels': labels},
+        outputs={'outputs': final_outputs})
