@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn_cell
 from tensorflow.nn import relu
-
+from tensorflow.python.saved_model import tag_constants
 from SoundSortDataManager import SoundSortDataManager
 
 def variable_normal(shape, name):
@@ -24,6 +24,7 @@ def placeholder(shape, name):
 data_dir = 'soundScrapeDumps'
 auth_json_path = '../soundScrape-d78c4b542d68.json'
 bucket_name = 'soundscrape-bucket'
+save_dir = 'lstm_save'
 logging.getLogger().setLevel(logging.INFO)
 
 # Configure model
@@ -64,17 +65,30 @@ train_step = tf.train.RMSPropOptimizer(0.001, 0.9).minimize(cross_entropy)
 # Define prediction
 prediction = tf.cast(final_outputs, tf.float32)
 
+if len(sys.argv) == 1:
+    # Save model if no load directory specified
+    builder = tf.saved_model.builder.SavedModelBuilder(save_dir)
+
 # Train model
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     # Initialize all variables
     sess.run(init)
 
+    if len(sys.argv) == 2:
+        # Load saved model
+        logging.info('Loading saved model at: {}'.format(sys.argv[1]))
+        tf.saved_model.loader.load(sess, [tag_constants.TRAINING], sys.argv[1])
+
+    if len(sys.argv) == 1:
+        builder.add_meta_graph_and_variables(sess, [tag_constants.TRAINING],
+            signature_def_map=None, assets_collection=None)
+
     for epoch in range(epochs):
         # Grab next batch
         train_data, train_labels = dm.next_batch(batch_size=batch_size)
 
-        # Feed batch into network
+        # Feed batch into model
         sess.run(train_step, feed_dict={inputs: train_data, labels: train_labels})
 
         if epoch % (epochs/10) == 0:
@@ -82,3 +96,7 @@ with tf.Session() as sess:
             test_data, test_label = dm.next_batch(batch_size=1)
             pred = sess.run(prediction, feed_dict={inputs: test_data, labels: test_label})
             logging.info('({}/{})  predicted: {}  actual: {}'.format(epoch, epochs, pred, test_label))
+
+if len(sys.argv) == 1:
+    # Save trained model
+    builder.save()

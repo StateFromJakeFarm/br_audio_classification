@@ -3,7 +3,6 @@ import sys
 import logging
 import numpy as np
 import tensorflow as tf
-
 from tensorflow.python.saved_model import tag_constants
 from SoundSortDataManager import SoundSortDataManager
 
@@ -56,8 +55,8 @@ with tf.Session() as sess:
     sess.run(init)
 
     if len(sys.argv) == 2:
-        # Load save
-        logging.info('Loading saved network at: {}'.format(sys.argv[1]))
+        # Load saved model
+        logging.info('Loading saved model at: {}'.format(sys.argv[1]))
         tf.saved_model.loader.load(sess, [tag_constants.TRAINING], sys.argv[1])
 
     if len(sys.argv) == 1:
