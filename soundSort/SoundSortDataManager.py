@@ -13,13 +13,21 @@ class SoundSortDataManager(object):
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, data_dir, auth_json, bucket, search_terms, rnn=False):
+    def __init__(self, data_dir, auth_json, bucket, sample_rate=160000, duration=120):
+        # Local directory for all audio files
         self.data_dir = data_dir
-        self.data_x = []
-        self.data_y = []
-        self.i = 0
-        self.search_terms = set(search_terms)
-        self.rnn = rnn
+
+        # Sample rate at which to load files
+        self.sample_rate = sample_rate
+
+        # Max seconds of audio to load for each file
+        self.duration = duration
+
+        # List to store NumPy arrays containing sound data
+        self.data = []
+
+        self.i = 0 # Current file
+        self.j = 0 # Next sample
 
         # Get authorization JSON
         if os.path.isfile(auth_json):
@@ -92,10 +100,22 @@ class SoundSortDataManager(object):
             logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
             return np.empty(0)
 
-    def prep_data(self, num_files=None, num_timesteps=100):
+    def load_file(self, file_path, duration):
         '''
-        Extract features from all files so they can be easily sliced into batches
-        during training.
+        Load a sound file
+        '''
+        try:
+            file_path = '{}/{}'.format(self.data_dir, file_path)
+            logging.info('loading {}'.format(file_path))
+
+            y, sr = librosa.load(file_path, sr=self.sample_rate, duration=duration)
+            self.data.append(y)
+        except Exception as e:
+            logging.error('Failed to load {}: {}'.format(file_path, e))
+
+    def prep_data(self, num_files=None, file_name=None):
+        '''
+        Load training files
         '''
         # Determine which files within the bucket we already have downloaded and
         # which we need to download now
@@ -121,68 +141,35 @@ class SoundSortDataManager(object):
                     self.convert_wav(local_path, dest_path)
                     os.remove(local_path)
 
-        # Perform feature extraction on all files
-        data = []
-        for i, file_path in enumerate(os.listdir(self.data_dir)):
-            if num_files and i >= num_files:
-                # We've prepped all the files the user wanted
-                break
+        # Load sound data into list of np.array objects
+        if file_name:
+            # If user wants one specific file, only load that one
+            self.load_file(file_name, self.duration)
+        else:
+            for i, file_path in enumerate(os.listdir(self.data_dir)):
+                if num_files and i >= num_files:
+                    # We've prepped all the files the user wanted
+                    break
 
-            file_path = '{}/{}'.format(self.data_dir, file_path)
-            logging.info('Extracting features from {}'.format(file_path))
+                self.load_file(file_path, self.duration)
 
-            features = self.extract_features(file_path)
-            if features.shape[0] == 0:
-                # Could not extract features
-                logging.warning('Failed to extract features from {}'.format(file_path))
-                continue
-
-            if self.rnn:
-                # Reshape data to be time-step major
-                ceptra = features.shape[0]
-                time_slots = features.shape[1]
-
-                features = features.reshape((time_slots, ceptra))
-
-                if time_slots < num_timesteps:
-                    # Needs padding to reach num_timesteps
-                    features = np.append(features, np.zeros((num_timesteps-time_slots, ceptra)))
-                    features = features.reshape((num_timesteps, ceptra))
-                elif time_slots > num_timesteps:
-                    # Needs truncating
-                    features = features[:num_timesteps]
-            else:
-                # Only flatten for regular feed-forward
-                features = features.flatten()
-
-            # Get search terms associated with this file by soundScrape
-            matched_terms = set(os.path.split(file_path)[-1].split('_')[0].split('-'))
-
-            # Add row to dataset
-            data.append([features, [(1 if len(list(self.search_terms & matched_terms)) else 0)]])
-
-        # Shuffle rows
-        shuffle(data)
-        for row in data:
-            self.data_x.append(row[0])
-            self.data_y.append(row[1])
-
-    def next_batch(self, batch_size=50):
+    def next_file(self):
         '''
-        Return numpy array of next training batch.
+        Move to next file in dataset
         '''
-        batch_x = []
-        batch_y = []
-        while len(batch_x) < batch_size:
-            batch_x.append(self.data_x[self.i])
-            batch_y.append(self.data_y[self.i])
+        self.i += 1
+        if self.i >= len(self.data):
+            self.i = 0
 
-            # Move to next file
-            self.i += 1
-            if self.i >= len(self.data_x):
-                self.i = 0
+    def next_chunk(self, sec=1):
+        '''
+        Serve next chunk of samples
+        '''
+        chunk_size = self.sample_rate * sec
+        chunk = self.data[self.i][self.j:self.j+chunk_size]
+        self.j += chunk_size
 
-        batch_x = np.array(batch_x)
-        batch_y = np.array(batch_y)
+        if (self.j+chunk_size)/self.sample_rate > self.duration:
+            self.j = 0
 
-        return batch_x, batch_y
+        return chunk
