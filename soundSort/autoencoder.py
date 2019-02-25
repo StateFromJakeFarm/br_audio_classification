@@ -45,14 +45,29 @@ auto_encoder = AutoEncoder(layer_dims).float()
 cross_entropy = torch.nn.L1Loss()
 optimizer = torch.optim.Rprop(auto_encoder.parameters(), lr=alpha)
 
+device = torch.device('cpu')
+if torch.cuda.device_count() > 1:
+    auto_encoder = torch.nn.DataParallel(auto_encoder, device_ids=[0, 3])
+    device = torch.device('cuda:0')
+
+auto_encoder.to(device)
+
 # Train network
 for epoch in range(num_epochs):
     for sec in range(duration):
+        # Get FFT for next chunk
         chunk = dm.next_chunk()
         fft = np.fft.fft(chunk).real.astype(np.float)
         fft_tensor = torch.from_numpy(fft).float()
+        fft_tensor = fft_tensor.to(device)
+
+        # Run network
         output = auto_encoder(fft_tensor)
+
+        # Calculate loss
         loss = cross_entropy(output, fft_tensor)
+
+        # Backpropagate
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
