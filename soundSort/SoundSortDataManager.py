@@ -26,6 +26,9 @@ class SoundSortDataManager(object):
         # List to store NumPy arrays containing sound data
         self.data = []
 
+        # Keep track of terms associated with each file
+        self.file_terms = []
+
         self.i = 0 # Current file
         self.j = 0 # Next sample
 
@@ -105,7 +108,8 @@ class SoundSortDataManager(object):
         Load a sound file
         '''
         try:
-            file_path = '{}/{}'.format(self.data_dir, file_path)
+            self.file_terms.append(set(file_path.split('_')[0].split('-')))
+            file_path = os.path.join(self.data_dir, file_path)
             logging.info('loading {}'.format(file_path))
 
             y, sr = librosa.load(file_path, sr=self.sample_rate, duration=duration)
@@ -173,3 +177,18 @@ class SoundSortDataManager(object):
             self.j = 0
 
         return chunk
+
+    def get_file_terms(self):
+        '''
+        Return set of terms identified by scraper when file was discovered
+        '''
+        return self.file_terms[self.i]
+
+    def next_chunk_and_label(self, target_term):
+        '''
+        Return tuple of (chunk, 1/0) where the second element is a boolean
+        denoting whether or not the file's description contains the
+        target term
+        '''
+        has_term = int(1 if target_term in get_file_terms() else 0)
+        return (self.next_chunk(), np.array([has_term]))

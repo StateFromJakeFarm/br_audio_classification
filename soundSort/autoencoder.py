@@ -11,11 +11,13 @@ from SoundSortDataManager import SoundSortDataManager as ssdm
 logging.getLogger().setLevel(logging.INFO)
 
 # High-level params
-sample_rate = 4000
+sample_rate = 12000
+batch_size = 3000
+num_batches = sample_rate / batch_size
 duration = 3
-num_epochs = 100
+num_epochs = 500
 alpha = 0.001
-layer_dims = [sample_rate, sample_rate-200, sample_rate-400]
+layer_dims = [batch_size, batch_size-200, batch_size-400]
 
 class AutoEncoder(nn.Module):
     def __init__(self, layer_dims):
@@ -58,20 +60,21 @@ for epoch in range(num_epochs):
     for sec in range(duration):
         # Get FFT for next chunk
         chunk = dm.next_chunk()
-        fft = np.fft.fft(chunk).real.astype(np.float)
-        fft_tensor = torch.from_numpy(fft).float()
-        fft_tensor = fft_tensor.to(device)
+        for batch in np.split(chunk, num_batches):
+            fft = np.fft.fft(batch).real.astype(np.float)
+            fft_tensor = torch.from_numpy(fft).float()
+            fft_tensor = fft_tensor.to(device)
 
-        # Run network
-        output = auto_encoder(fft_tensor)
+            # Run network
+            output = auto_encoder(fft_tensor)
 
-        # Calculate loss
-        loss = cross_entropy(output, fft_tensor)
+            # Calculate loss
+            loss = cross_entropy(output, fft_tensor)
 
-        # Backpropagate
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            # Backpropagate
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         if sec == duration-1:
             logging.info('{}/{} loss = {}'.format(epoch+1, num_epochs, loss))
@@ -81,14 +84,15 @@ dm.i = 0 # Go back to beginning of file
 wav_data = np.empty(1, dtype=np.float64)
 for sec in range(duration):
     chunk = dm.next_chunk()
-    fft = np.fft.fft(chunk).real.astype(np.float)
-    fft_tensor = torch.from_numpy(fft).float()
+    for batch in np.split(chunk, num_batches):
+        fft = np.fft.fft(batch).real.astype(np.float)
+        fft_tensor = torch.from_numpy(fft).float()
 
-    output = auto_encoder(fft_tensor)
-    if use_cuda:
-        output = output.cpu()
-    output = output.detach().numpy()
+        output = auto_encoder(fft_tensor)
+        if use_cuda:
+            output = output.cpu()
+        output = output.detach().numpy()
 
-    wav_data = np.concatenate((wav_data, np.fft.ifft(output).real.astype(np.float)))
+        wav_data = np.concatenate((wav_data, np.fft.ifft(output).real.astype(np.float)))
 
 write('autoencoder_output.wav', sample_rate, wav_data)
