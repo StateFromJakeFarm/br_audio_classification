@@ -45,7 +45,7 @@ cross_entropy = torch.nn.L1Loss()
 optimizer = torch.optim.Rprop(auto_encoder.parameters(), lr=alpha)
 
 # Train network
-for epoch in range(1, num_epochs):
+for epoch in range(num_epochs):
     for _ in range(duration):
         chunk = dm.next_chunk()
         fft = np.fft.fft(chunk).real.astype(np.float)
@@ -57,4 +57,4 @@ for epoch in range(1, num_epochs):
         optimizer.step()
 
         if _ == duration-1:
-            logging.info('{}/{} loss = {}'.format(epoch, num_epochs, loss))
+            logging.info('{}/{} loss = {}'.format(epoch+1, num_epochs, loss))
