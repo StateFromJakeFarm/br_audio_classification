@@ -11,9 +11,9 @@ from SoundSortDataManager import SoundSortDataManager as ssdm
 logging.getLogger().setLevel(logging.INFO)
 
 # High-level params
-sample_rate = 2000
+sample_rate = 4000
 duration = 3
-num_epochs = 20
+num_epochs = 100
 alpha = 0.001
 layer_dims = [sample_rate, sample_rate-200, sample_rate-400]
 
@@ -46,8 +46,9 @@ cross_entropy = torch.nn.L1Loss()
 optimizer = torch.optim.Rprop(auto_encoder.parameters(), lr=alpha)
 
 device = torch.device('cpu')
-if torch.cuda.device_count() > 1:
-    auto_encoder = torch.nn.DataParallel(auto_encoder, device_ids=[0, 3])
+use_cuda = (torch.cuda.device_count() > 1)
+if use_cuda:
+    auto_encoder = torch.nn.DataParallel(auto_encoder, device_ids=[0])
     device = torch.device('cuda:0')
 
 auto_encoder.to(device)
@@ -82,7 +83,12 @@ for sec in range(duration):
     chunk = dm.next_chunk()
     fft = np.fft.fft(chunk).real.astype(np.float)
     fft_tensor = torch.from_numpy(fft).float()
-    output = auto_encoder(fft_tensor).detach().numpy()
+
+    output = auto_encoder(fft_tensor)
+    if use_cuda:
+        output = output.cpu()
+    output = output.detach().numpy()
+
     wav_data = np.concatenate((wav_data, np.fft.ifft(output).real.astype(np.float)))
 
 write('autoencoder_output.wav', sample_rate, wav_data)
