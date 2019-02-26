@@ -12,12 +12,12 @@ logging.getLogger().setLevel(logging.INFO)
 
 # High-level params
 sample_rate = 12000
-batch_size = 3000
+batch_size = 4000
 num_batches = sample_rate / batch_size
-duration = 3
-num_epochs = 500
-alpha = 0.001
-layer_dims = [batch_size, batch_size-200, batch_size-400]
+duration = 2
+num_epochs = 200
+alpha = 0.0001
+layer_dims = [batch_size, batch_size-100, batch_size-200, batch_size-300]
 
 class AutoEncoder(nn.Module):
     def __init__(self, layer_dims):
@@ -40,7 +40,7 @@ class AutoEncoder(nn.Module):
 
 dm = ssdm('soundScrapeDumps', '../soundScrape-d78c4b542d68.json',
     'soundscrape-bucket', sample_rate=sample_rate, duration=duration)
-dm.prep_data(file_name='metal-bolt-lock-metal-bolt-lock_7bb0b7659124099b91d3689c872d7934becba3ec.wav')
+dm.prep_data(file_name='wind-metal-wind-metal_69699137754365d68f61c826163d29e16ec7c901.wav')
 
 # Create network
 auto_encoder = AutoEncoder(layer_dims).float()
