@@ -10,24 +10,16 @@ from SoundSortDataManager import SoundSortDataManager as ssdm
 logging.getLogger().setLevel(logging.INFO)
 
 # High-level params
-sample_rate = 4000
-batch_size = 1000
+sample_rate = 16000
+batch_size = 2000
 num_batches = sample_rate / batch_size
-duration = 2
+duration = 5
 num_epochs = 100
 input_dim = batch_size
-hidden_dim = int(batch_size * 1.25)
+hidden_dim = int(batch_size * 0.8)
 
 class AutoEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, use_cuda):
-        super(AutoEncoder, self).__init__()
-        self.lstm1 = nn.LSTMCell(input_dim, hidden_dim)
-        self.lstm2 = nn.LSTMCell(hidden_dim, hidden_dim)
-        self.linear = nn.Linear(hidden_dim, input_dim)
-
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-
+    def reset_hidden_and_cell_state(self):
         self.h_t = torch.zeros(1, hidden_dim, dtype=torch.float)
         self.c_t = torch.zeros(1, hidden_dim, dtype=torch.float)
         self.h2_t = torch.zeros(1, hidden_dim, dtype=torch.float)
@@ -39,23 +31,31 @@ class AutoEncoder(nn.Module):
             self.h2_t = self.h2_t.cuda()
             self.c2_t = self.c2_t.cuda()
 
+    def __init__(self, input_dim, hidden_dim, use_cuda):
+        super(AutoEncoder, self).__init__()
+        self.lstm1 = nn.LSTMCell(input_dim, hidden_dim)
+        self.lstm2 = nn.LSTMCell(hidden_dim, hidden_dim)
+        self.linear = nn.Linear(hidden_dim, input_dim)
+
+        self.reset_hidden_and_cell_state()
+
     def forward(self, input_data):
         self.h_t, self.c_t = self.lstm1(input_data, (self.h_t, self.c_t))
         self.h2_t, self.c2_t = self.lstm2(self.h_t, (self.h2_t, self.c2_t))
         output = self.linear(self.h2_t)
 
-        return output
+        return output       
 
 
 dm = ssdm('soundScrapeDumps', '../soundScrape-d78c4b542d68.json',
     'soundscrape-bucket', sample_rate=sample_rate, duration=duration)
-dm.prep_data(file_name='wind-metal-wind-metal_69699137754365d68f61c826163d29e16ec7c901.wav')
+dm.prep_data(file_name='chirp-bird_93d28749bf335de4b1f769d0e83cc3c9599662eb.wav')
 
 # Create network
 use_cuda = (torch.cuda.device_count() > 1)
 auto_encoder = AutoEncoder(input_dim, hidden_dim, use_cuda)
 loss_function = nn.L1Loss()
-optimizer = optim.SGD(auto_encoder.parameters(), lr=0.001)
+optimizer = optim.SGD(auto_encoder.parameters(), lr=0.005)
 
 device = torch.device('cpu')
 if use_cuda:
@@ -67,6 +67,12 @@ auto_encoder.float()
 
 # Train network
 for epoch in range(num_epochs):
+    # Reset LSTM cell state
+    if use_cuda:
+        auto_encoder.module.reset_hidden_and_cell_state()
+    else:
+        auto_encoder.reset_hidden_and_cell_state()
+
     for sec in range(duration):
         chunk = dm.next_chunk()
 
@@ -95,6 +101,13 @@ for epoch in range(num_epochs):
 # Write decompressed version back to wavfile
 dm.i = 0 # Go back to beginning of file
 wav_data = np.empty(1, dtype=np.float64)
+
+# Reset LSTM cell state
+if use_cuda:
+    auto_encoder.module.reset_hidden_and_cell_state()
+else:
+    auto_encoder.reset_hidden_and_cell_state()
+
 for sec in range(duration):
     chunk = dm.next_chunk()
     for batch in np.split(chunk, num_batches):
