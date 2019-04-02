@@ -96,5 +96,5 @@ class Classifier:
 
                     logging.info('({}/{}) model {}: error = {}'.format(e+1, epochs, i+1, np.mean(np.abs(output - correct_output))))
 
-classifier = Classifier('/home/jakeh/Downloads/UrbanSound8K/audio', 800, 100)
-classifier.train(10)
+classifier = Classifier('/home/jakeh/Downloads/UrbanSound8K/audio', 800, 10)
+classifier.train(100)
