@@ -8,7 +8,7 @@ class UrbanSoundDataManager:
     '''
     Load files from UrbanSound8K dataset for training and testing
     '''
-    def __init__(self, audio_dir, test_fold=None, sr=8000):
+    def __init__(self, audio_dir, test_fold=None, sr=8000, file_duration=4, chunk_duration=0.1):
         '''
         Constructor
         '''
@@ -52,33 +52,41 @@ class UrbanSoundDataManager:
         # Shuffle training set order
         random.shuffle(self.train_files)
 
+        # Batch size details
+        self.file_duration = file_duration
+        self.chunks = int(file_duration/chunk_duration)
+        self.chunk_len = int(chunk_duration*self.sr)
+        self.total_samples = self.sr*file_duration
+
         # Iterator to keep track of where we are in the training set
         self.i = 0
 
-    def get_batch(self, size=10, file_duration=4, chunk_duration=0.1):
+    def get_batch(self, size=10):
         '''
         Get next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
         '''
-        # Tensor to hold RNN data
-        chunks = int(file_duration/chunk_duration)
-        chunk_len = int(chunk_duration*self.sr)
-
         # Compile file data for this chunk into tensor
-        total_samples = self.sr*file_duration
-        batch = np.zeros((size, chunks, chunk_len), dtype=float)
+        batch = np.zeros((size, self.chunks, self.chunk_len), dtype=float)
+        labels = []
         for i, train_file in enumerate(self.train_files[self.i:self.i+size]):
-            Y, sr = librosa.core.load(train_file, sr=self.sr, duration=file_duration)
+            # Extract label
+            labels.append(int(os.path.split(train_file)[-1].split('-')[1]))
 
-            if Y.shape[0] < total_samples:
+            # Load data
+            Y, sr = librosa.core.load(train_file, sr=self.sr, duration=self.file_duration)
+
+            if Y.shape[0] < self.total_samples:
                 # Pad this array with zeros on the end
-                Y = np.pad(Y, (0, total_samples-Y.shape[0]), 'constant')
+                Y = np.pad(Y, (0, self.total_samples-Y.shape[0]), 'constant')
 
             # Chunk-up data
-            for chunk in range(chunks):
-                batch[i][chunk] = Y[chunk*chunk_len:chunk*chunk_len+chunk_len]
+            for chunk in range(self.chunks):
+                batch[i][chunk] = Y[chunk*self.chunk_len:chunk*self.chunk_len+self.chunk_len]
 
         # Increment iterator
         self.i += size
+        if self.i + size >= len(self.train_files):
+            self.i = 0
 
-        return batch
+        return torch.from_numpy(batch).float(), labels
