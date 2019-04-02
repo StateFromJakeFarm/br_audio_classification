@@ -30,6 +30,7 @@ class Classifier:
             self.chunk_len = chunk_len
             self.label = label
 
+            # Define model
             self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
             self.linear_portion = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
@@ -38,6 +39,7 @@ class Classifier:
                 nn.ReLU()
             )
 
+            # Init hidden and cell states
             self.init_state_tensors()
 
         def forward(self, x):
@@ -69,7 +71,7 @@ class Classifier:
 
     def train(self, epochs):
         for e in range(epochs):
-            batch, labels = self.dm.get_batch('train')
+            batch, labels = self.dm.get_batch('train', size=self.batch_size)
 
             for i in range(len(self.models)):
                 model = self.models[i]
@@ -90,11 +92,11 @@ class Classifier:
 
                 if (e+1) % (epochs/10) == 0:
                     # Run against test set
-                    batch, labels = self.dm.get_batch('test')
+                    batch, labels = self.dm.get_batch('test', size=self.batch_size)
                     output = model(batch).detach().numpy()
                     correct_output = np.array([float(label == model.label) for label in labels])
 
                     logging.info('({}/{}) model {}: error = {}'.format(e+1, epochs, i+1, np.mean(np.abs(output - correct_output))))
 
-classifier = Classifier('/home/jakeh/Downloads/UrbanSound8K/audio', 800, 10)
-classifier.train(100)
+classifier = Classifier('/home/jakeh/Downloads/UrbanSound8K/audio', 800, 100)
+classifier.train(50)
