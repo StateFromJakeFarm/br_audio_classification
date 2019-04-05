@@ -7,8 +7,6 @@ import logging
 from UrbanSoundDataManager import UrbanSoundDataManager
 from sys import argv, stderr
 
-logging.getLogger().setLevel(logging.INFO)
-
 # Model params
 hidden_dim = 800
 batch_dim = 100
@@ -107,8 +105,12 @@ class Classifier:
 
 if __name__ == '__main__':
     if len(argv) == 2:
+        # Set log level
+        logging.getLogger().setLevel(logging.INFO)
+
+        # Train classifier
         classifier = Classifier(argv[1], hidden_dim, batch_dim, lr)
         classifier.train(epochs)
     else:
         print('USAGE: classifier.py <path to audio dir>', file=stderr)
-    exit(1)
+        exit(1)
