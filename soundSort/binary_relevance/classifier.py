@@ -13,6 +13,7 @@ logging.getLogger().setLevel(logging.INFO)
 hidden_dim = 800
 batch_dim = 100
 lr = 0.005
+epochs = 50
 
 class Classifier:
     '''
@@ -104,9 +105,10 @@ class Classifier:
 
                     logging.info('({}/{}) model {}: error = {}'.format(e+1, epochs, i+1, np.mean(np.abs(output - correct_output))))
 
-if len(argv) == 2:
-    classifier = Classifier(argv[1], hidden_dim, batch_dim, lr)
-    classifier.train(50)
-else:
-    print('USAGE: classifier.py <path to audio dir>', file=stderr)
+if __name__ == '__main__':
+    if len(argv) == 2:
+        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr)
+        classifier.train(epochs)
+    else:
+        print('USAGE: classifier.py <path to audio dir>', file=stderr)
     exit(1)
