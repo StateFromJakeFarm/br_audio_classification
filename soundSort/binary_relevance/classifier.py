@@ -5,8 +5,14 @@ import numpy as np
 import logging
 
 from UrbanSoundDataManager import UrbanSoundDataManager
+from sys import argv, stderr
 
 logging.getLogger().setLevel(logging.INFO)
+
+# Model params
+hidden_dim = 800
+batch_dim = 100
+lr = 0.005
 
 class Classifier:
     '''
@@ -98,5 +104,9 @@ class Classifier:
 
                     logging.info('({}/{}) model {}: error = {}'.format(e+1, epochs, i+1, np.mean(np.abs(output - correct_output))))
 
-classifier = Classifier('/home/jakeh/Downloads/UrbanSound8K/audio', 800, 100)
-classifier.train(50)
+if len(argv) == 2:
+    classifier = Classifier(argv[1], hidden_dim, batch_dim, lr)
+    classifier.train(50)
+else:
+    print('USAGE: classifier.py <path to audio dir>', file=stderr)
+    exit(1)
