@@ -38,7 +38,6 @@ pbr
 pexpect
 pickleshare
 Pillow
-pkg-resources
 prompt-toolkit
 protobuf
 ptyprocess

@@ -67,12 +67,13 @@ class Classifier:
 
         # Determine device for training
         self.device_ids = device_ids
-        if len(self.device_ids):
+        self.use_cuda = (torch.cuda.device_count() > 1)
+        if self.use_cuda and len(self.device_ids):
             # Use GPU if available
             logging.info('Using CUDA GPU')
-            self.use_cuda = (torch.cuda.device_count() > 1)
             self.device = torch.device('cuda:0')
         else:
+            # Otherwise use CPU
             logging.info('Using CPU')
             self.use_cuda = False
             self.device = torch.device('cpu')
