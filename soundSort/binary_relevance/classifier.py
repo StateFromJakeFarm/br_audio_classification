@@ -57,36 +57,61 @@ class Classifier:
 
             return x
 
-    def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005):
+    def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_ids=[]):
+        logging.info('Initializing data manager')
         self.dm = UrbanSoundDataManager(audio_dir)
         self.batch_size = batch_size
 
         # Loss function used during training
         self.loss_function = nn.L1Loss()
 
+        # Determine device for training
+        self.device_ids = device_ids
+        if len(self.device_ids):
+            # Use GPU if available
+            logging.info('Using CUDA GPU')
+            self.use_cuda = (torch.cuda.device_count() > 1)
+            self.device = torch.device('cuda:0')
+        else:
+            logging.info('Using CPU')
+            self.use_cuda = False
+            self.device = torch.device('cpu')
+
+        logging.info('Constructing models')
         self.models = []
         self.optimizers = []
         for label in range(1, 11):
             model = self.Model(self.dm.chunk_len, hidden_size, batch_size, self.dm.chunks, self.dm.chunk_len, label)
             model.float()
+
+            if self.use_cuda:
+                # Prep model to train on GPU
+                model = nn.DataParallel(model, device_ids=self.device_ids)
+
             self.models.append(model)
 
             # Optimizers specific to each model
             self.optimizers.append(optim.SGD(model.parameters(), lr=lr))
 
     def train(self, epochs):
+        logging.info('Begin training')
         for e in range(epochs):
             batch, labels = self.dm.get_batch('train', size=self.batch_size)
+            batch.to(self.device)
 
             for i in range(len(self.models)):
+                # Retrieve model
                 model = self.models[i]
+                model.to(self.device)
+
+                # Retrieve optimizer
                 optimizer = self.optimizers[i]
 
                 # Run network
                 output = model(batch)
 
                 # Determine correct output for this batch
-                correct_output = torch.Tensor([float(label == model.label) for label in labels])
+                correct_output = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
                 # Calculate loss
                 loss = self.loss_function(output, correct_output)
@@ -102,15 +127,22 @@ class Classifier:
                     correct_output = np.array([float(label == model.label) for label in labels])
 
                     logging.info('({}/{}) model {}: error = {}'.format(e+1, epochs, i+1, np.mean(np.abs(output - correct_output))))
+        logging.info('Finish training')
 
 if __name__ == '__main__':
-    if len(argv) == 2:
+    if len(argv) in [2, 3]:
         # Set log level
         logging.getLogger().setLevel(logging.INFO)
 
+        # Determine if user selected GPUs to use for training
+        if len(argv) == 3:
+            device_ids = [int(i) for i in argv[2].split(',')]
+        else:
+            device_ids = []
+
         # Train classifier
-        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr)
+        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr=lr, device_ids=device_ids)
         classifier.train(epochs)
     else:
-        print('USAGE: classifier.py <path to audio dir>', file=stderr)
+        print('USAGE: classifier.py <path to audio dir> [comma-separated GPU ids]', file=stderr)
         exit(1)
