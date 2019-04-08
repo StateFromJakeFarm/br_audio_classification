@@ -10,8 +10,8 @@ from sys import argv, stderr
 # Model params
 hidden_dim = 100
 batch_dim = 100
-lr = 0.05
-epochs = 10
+lr = 0.08
+epochs = 50
 
 class Classifier:
     '''
@@ -40,9 +40,9 @@ class Classifier:
             self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
             self.linear_portion = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(),
+                nn.Sigmoid(),
                 nn.Linear(hidden_size, 1),
-                nn.ReLU()
+                nn.Sigmoid()
             )
 
             # Init hidden and cell states
@@ -115,11 +115,14 @@ class Classifier:
             labels = np.array([int(label == model.label) for label in labels])
 
             # Run model
-            rounded_output = np.rint(model(batch).detach().cpu().numpy())
+            output = model(batch).detach().cpu().numpy()
 
             # Get number of mislabeled files
             c_true += np.sum(labels)
-            o_true += np.sum(rounded_output)
+            o_true += np.sum(np.rint(output))
+            for i in range(len(labels)):
+                if labels[i]:
+                    print(output[i][0])
 
         return c_true, o_true
 
