@@ -8,9 +8,9 @@ from UrbanSoundDataManager import UrbanSoundDataManager
 from sys import argv, stderr
 
 # Model params
-hidden_dim = 400
+hidden_dim = 100
 batch_dim = 100
-lr = 0.005
+lr = 0.05
 epochs = 10
 
 class Classifier:
@@ -112,7 +112,7 @@ class Classifier:
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
             batch.to(self.device)
-            labels = np.array(labels)
+            labels = np.array([int(label == model.label) for label in labels])
 
             # Run model
             rounded_output = np.rint(model(batch).detach().cpu().numpy())
