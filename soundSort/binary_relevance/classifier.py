@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import logging
 
 from UrbanSoundDataManager import UrbanSoundDataManager
@@ -112,17 +111,17 @@ class Classifier:
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
             batch.to(self.device)
-            labels = np.array([int(label == model.label) for label in labels])
+            labels = torch.Tensor([float(label == model.label) for label in labels])
 
             # Run model
-            output = model(batch).detach().cpu().numpy()
+            output = model(batch)
 
             # Get number of mislabeled files
-            c_true += np.sum(labels)
-            o_true += np.sum(np.rint(output))
+            c_true += torch.sum(labels).item()
+            o_true += torch.sum(torch.round(output)).item()
             for i in range(len(labels)):
                 if labels[i]:
-                    print(output[i][0])
+                    logging.info(output[i][0].item())
 
         return c_true, o_true
 
