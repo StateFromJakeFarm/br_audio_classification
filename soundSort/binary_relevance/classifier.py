@@ -9,8 +9,8 @@ from sys import argv, stderr
 # Model params
 hidden_dim = 100
 batch_dim = 100
-lr = 0.01
-epochs = 10
+lr = 0.005
+epochs = 100
 
 class Classifier:
     '''
@@ -41,9 +41,9 @@ class Classifier:
                 nn.Linear(hidden_size, hidden_size),
                 nn.Tanh(),
                 nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(),
+                nn.Sigmoid(),
                 nn.Linear(hidden_size, 1),
-                nn.ReLU(),
+                nn.Sigmoid()
             )
 
             # Init hidden and cell states
@@ -51,17 +51,15 @@ class Classifier:
 
         def forward(self, x):
             # Run network
-            x, self.h = self.lstm(x, (self.h, self.c))
+            x, state_tuple = self.lstm(x, (self.h, self.c))
+            self.h, self.c = state_tuple
             x = self.linear_portion.forward(x[:, -1, :])
-
-            # Forget everything
-            self.init_state_tensors()
 
             return x
 
     def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_ids=[]):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(audio_dir)
+        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=0.9)
         self.batch_size = batch_size
 
         # Loss function used during training
@@ -121,9 +119,6 @@ class Classifier:
             # Get number of mislabeled files
             c_true += torch.sum(labels).item()
             o_true += torch.sum(torch.round(output)).item()
-            for i in range(len(labels)):
-                if labels[i]:
-                    logging.info(output[i][0].item())
 
         return c_true, o_true
 
@@ -136,6 +131,8 @@ class Classifier:
             model.to(self.device)
 
             for e in range(epochs):
+                model.zero_grad()
+
                 # Retrieve batch
                 batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
                 batch.to(self.device)
