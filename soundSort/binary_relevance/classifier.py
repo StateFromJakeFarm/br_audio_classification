@@ -9,8 +9,8 @@ from sys import argv, stderr
 # Model params
 hidden_dim = 100
 batch_dim = 100
-lr = 0.08
-epochs = 50
+lr = 0.01
+epochs = 10
 
 class Classifier:
     '''
@@ -39,9 +39,11 @@ class Classifier:
             self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
             self.linear_portion = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
-                nn.Sigmoid(),
+                nn.Tanh(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(),
                 nn.Linear(hidden_size, 1),
-                nn.Sigmoid()
+                nn.ReLU(),
             )
 
             # Init hidden and cell states
@@ -135,7 +137,7 @@ class Classifier:
 
             for e in range(epochs):
                 # Retrieve batch
-                batch, labels = self.dm.get_batch('train', size=self.batch_size)
+                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
                 batch.to(self.device)
 
                 # Retrieve optimizer
