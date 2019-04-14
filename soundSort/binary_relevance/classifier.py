@@ -10,7 +10,8 @@ from sys import argv, stderr
 hidden_dim = 100
 batch_dim = 100
 lr = 0.005
-epochs = 100
+epochs = 1000
+train_class_pct = 0.5
 
 class Classifier:
     '''
@@ -22,8 +23,8 @@ class Classifier:
         Model used to identify each class
         '''
         def init_state_tensors(self):
-            self.h = torch.randn(1, self.batch_size, self.hidden_size).to(self.device)
-            self.c = torch.randn(1, self.batch_size, self.hidden_size).to(self.device)
+            self.h = torch.randn(3, self.batch_size, self.hidden_size).to(self.device)
+            self.c = torch.randn(3, self.batch_size, self.hidden_size).to(self.device)
 
         def __init__(self, input_size, hidden_size, batch_size, chunks, chunk_len, label, device):
             super(Classifier.Model, self).__init__()
@@ -36,10 +37,10 @@ class Classifier:
             self.device = device
 
             # Define model
-            self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+            self.lstm = nn.LSTM(input_size, hidden_size, num_layers=3, batch_first=True)
             self.linear_portion = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
-                nn.Tanh(),
+                nn.Sigmoid(),
                 nn.Linear(hidden_size, hidden_size),
                 nn.Sigmoid(),
                 nn.Linear(hidden_size, 1),
@@ -57,21 +58,21 @@ class Classifier:
 
             return x
 
-    def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_ids=[]):
+    def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_id=None, train_class_pct=0.5):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=0.9)
+        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=2)
         self.batch_size = batch_size
 
         # Loss function used during training
         self.loss_function = nn.L1Loss()
 
         # Determine device for training
-        self.device_ids = device_ids
         self.use_cuda = (torch.cuda.device_count() > 1)
-        if self.use_cuda and len(self.device_ids):
+        if self.use_cuda and device_id is not None:
             # Use GPU if available
             logging.info('Using CUDA GPU')
-            self.device = torch.device('cuda:0')
+            device_id = int(device_id)
+            self.device = torch.device('cuda:{}'.format(device_id))
         else:
             # Otherwise use CPU
             logging.info('Using CPU')
@@ -81,14 +82,14 @@ class Classifier:
         logging.info('Constructing models')
         self.models = []
         self.optimizers = []
-        for label in range(1, 11):
+        for label in range(len(self.dm.classes)):
             model = self.Model(self.dm.chunk_len, hidden_size, batch_size, self.dm.chunks, self.dm.chunk_len, label, self.device)
             model.float()
 
             if self.use_cuda:
                 # Prep model to train on GPU
                 label = model.label
-                model = nn.DataParallel(model, device_ids=self.device_ids)
+                model = nn.DataParallel(model, device_ids=[device_id])
 
                 # Hack to get DataParallel object to maintain Model object's label
                 setattr(model, 'label', label)
@@ -111,21 +112,26 @@ class Classifier:
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
             batch.to(self.device)
-            labels = torch.Tensor([float(label == model.label) for label in labels])
+            labels_tensor = torch.Tensor([float(label == model.label) for label in labels])
 
             # Run model
             output = model(batch)
 
             # Get number of mislabeled files
-            c_true += torch.sum(labels).item()
+            c_true += torch.sum(labels_tensor).item()
             o_true += torch.sum(torch.round(output)).item()
+            for i in range(len(labels)):
+                if labels[i]:
+                    print(output[i][0].item())
+                elif i % 10:
+                    print('NOT: {}'.format(output[i][0].item()))
 
         return c_true, o_true
 
     def train(self, epochs):
         logging.info('Begin training')
 
-        for i in range(len(self.models)):
+        for i in range(epochs):
             # Retrieve model
             model = self.models[i]
             model.to(self.device)
@@ -148,6 +154,8 @@ class Classifier:
 
                 # Calculate loss
                 loss = self.loss_function(output, correct_output)
+                del output
+                del correct_output
 
                 # Backpropagate
                 loss.backward(retain_graph=True)
@@ -157,6 +165,10 @@ class Classifier:
                     # Run against test set
                     c_true, o_true = self.test(model)
                     logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, i, c_true, o_true))
+
+            # Free up memory on GPU
+            del model
+
         logging.info('Finish training')
 
 if __name__ == '__main__':
@@ -166,12 +178,12 @@ if __name__ == '__main__':
 
         # Determine if user selected GPUs to use for training
         if len(argv) == 3:
-            device_ids = [int(i) for i in argv[2].split(',')]
+            device_id = argv[2]
         else:
-            device_ids = []
+            device_id = None
 
         # Train classifier
-        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr=lr, device_ids=device_ids)
+        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr=lr, device_id=device_id, train_class_pct=train_class_pct)
         classifier.train(epochs)
     else:
         print('USAGE: classifier.py <path to audio dir> [comma-separated GPU ids]', file=stderr)
