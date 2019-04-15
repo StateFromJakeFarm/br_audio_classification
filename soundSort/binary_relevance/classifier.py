@@ -7,11 +7,13 @@ from UrbanSoundDataManager import UrbanSoundDataManager
 from sys import argv, stderr
 
 # Model params
-hidden_dim = 100
-batch_dim = 100
+hidden_dim = 50
+batch_dim = 50
 lr = 0.005
-epochs = 1000
+epochs = 500
 train_class_pct = 0.5
+file_duration = 1
+num_rec_layers = 2
 
 class Classifier:
     '''
@@ -23,8 +25,8 @@ class Classifier:
         Model used to identify each class
         '''
         def init_state_tensors(self):
-            self.h = torch.randn(3, self.batch_size, self.hidden_size).to(self.device)
-            self.c = torch.randn(3, self.batch_size, self.hidden_size).to(self.device)
+            self.h = torch.randn(num_rec_layers, self.batch_size, self.hidden_size).to(self.device)
+            self.c = torch.randn(num_rec_layers, self.batch_size, self.hidden_size).to(self.device)
 
         def __init__(self, input_size, hidden_size, batch_size, chunks, chunk_len, label, device):
             super(Classifier.Model, self).__init__()
@@ -37,7 +39,7 @@ class Classifier:
             self.device = device
 
             # Define model
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers=3, batch_first=True)
+            self.lstm = nn.LSTM(input_size, hidden_size, num_layers=num_rec_layers, batch_first=True)
             self.linear_portion = nn.Sequential(
                 nn.Linear(hidden_size, hidden_size),
                 nn.Sigmoid(),
@@ -60,7 +62,7 @@ class Classifier:
 
     def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_id=None, train_class_pct=0.5):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=2)
+        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=file_duration)
         self.batch_size = batch_size
 
         # Loss function used during training
@@ -131,7 +133,7 @@ class Classifier:
     def train(self, epochs):
         logging.info('Begin training')
 
-        for i in range(epochs):
+        for i in range(len(self.dm.classes)):
             # Retrieve model
             model = self.models[i]
             model.to(self.device)

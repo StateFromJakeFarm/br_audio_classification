@@ -121,7 +121,7 @@ class UrbanSoundDataManager:
 
             if Y.shape[0] < self.total_samples:
                 # Pad this array with zeros on the end
-                Y = np.pad(Y, (0, self.total_samples-Y.shape[0]), 'constant')
+                Y = np.pad(Y, (0, int(self.total_samples-Y.shape[0])), 'constant')
 
             # Chunk-up data
             for chunk in range(self.chunks):
