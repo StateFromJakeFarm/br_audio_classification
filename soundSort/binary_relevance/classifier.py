@@ -10,10 +10,11 @@ from sys import argv, stderr
 hidden_dim = 50
 batch_dim = 50
 lr = 0.005
-epochs = 500
+epochs = 1000
 train_class_pct = 0.5
-file_duration = 1
+file_duration = 2
 num_rec_layers = 2
+use_fft = True
 
 class Classifier:
     '''
@@ -112,7 +113,7 @@ class Classifier:
         num_batches = num_test_files//self.batch_size
         for i in range(num_batches):
             # Get testing batch
-            batch, labels = self.dm.get_batch('test', size=self.batch_size)
+            batch, labels = self.dm.get_batch('test', size=self.batch_size, use_fft=use_fft)
             batch.to(self.device)
             labels_tensor = torch.Tensor([float(label == model.label) for label in labels])
 
@@ -142,7 +143,7 @@ class Classifier:
                 model.zero_grad()
 
                 # Retrieve batch
-                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
+                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i, use_fft=use_fft)
                 batch.to(self.device)
 
                 # Retrieve optimizer

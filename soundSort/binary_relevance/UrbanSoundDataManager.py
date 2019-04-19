@@ -4,6 +4,8 @@ import random
 import librosa
 import numpy as np
 
+from numpy.fft import fft
+
 class UrbanSoundDataManager:
     '''
     Load files from UrbanSound8K dataset for training and testing
@@ -83,7 +85,7 @@ class UrbanSoundDataManager:
         self.i_train = [0 for c in self.classes]
         self.i_test = 0
 
-    def get_batch(self, type, size=10, train_class=None):
+    def get_batch(self, type, size=10, train_class=None, use_fft=False):
         '''
         Get next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
@@ -127,7 +129,11 @@ class UrbanSoundDataManager:
             for chunk in range(self.chunks):
                 batch[i][chunk] = Y[chunk*self.chunk_len:chunk*self.chunk_len+self.chunk_len]
 
-        return torch.from_numpy(batch).float(), labels
+                if use_fft:
+                    # Use FFT of chunk
+                    batch[i][chunk] = fft(batch[i][chunk]).real
+
+        return torch.from_numpy(batch.astype(np.float32)), labels
 
     def get_label(self, file):
         '''
