@@ -4,17 +4,17 @@ import torch.optim as optim
 import logging
 
 from UrbanSoundDataManager import UrbanSoundDataManager
-from sys import argv, stderr
+from sys import argv, stderr, getsizeof
 
 # Model params
-hidden_dim = 50
-batch_dim = 50
+hidden_dim = 256
+batch_dim = 256
 lr = 0.005
 epochs = 1000
 train_class_pct = 0.5
-file_duration = 2
+file_duration = 4
 num_rec_layers = 2
-use_fft = True
+sr = 16000
 
 class Classifier:
     '''
@@ -63,7 +63,7 @@ class Classifier:
 
     def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_id=None, train_class_pct=0.5):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=file_duration)
+        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         self.batch_size = batch_size
 
         # Loss function used during training
@@ -106,6 +106,7 @@ class Classifier:
         '''
         Determine a model's accuracy against testing set
         '''
+        model.test()
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
@@ -113,7 +114,7 @@ class Classifier:
         num_batches = num_test_files//self.batch_size
         for i in range(num_batches):
             # Get testing batch
-            batch, labels = self.dm.get_batch('test', size=self.batch_size, use_fft=use_fft)
+            batch, labels = self.dm.get_batch('test', size=self.batch_size)
             batch.to(self.device)
             labels_tensor = torch.Tensor([float(label == model.label) for label in labels])
 
@@ -134,20 +135,26 @@ class Classifier:
     def train(self, epochs):
         logging.info('Begin training')
 
-        for i in range(len(self.dm.classes)):
-            # Retrieve model
-            model = self.models[i]
+        for i, model in enumerate(self.models):
+            # Move model to training device
             model.to(self.device)
 
+            # Retrieve optimizer
+            optimizer = self.optimizers[i]
+
             for e in range(epochs):
+                model.train()
                 model.zero_grad()
 
                 # Retrieve batch
-                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i, use_fft=use_fft)
+                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
                 batch.to(self.device)
 
-                # Retrieve optimizer
-                optimizer = self.optimizers[i]
+                # Wipe state clean for next file (gross way to do it)
+                try:
+                    model.module.init_state_tensors()
+                except AttributeError:
+                    model.init_state_tensors()
 
                 # Run network
                 output = model(batch)
@@ -157,20 +164,16 @@ class Classifier:
 
                 # Calculate loss
                 loss = self.loss_function(output, correct_output)
-                del output
-                del correct_output
 
                 # Backpropagate
-                loss.backward(retain_graph=True)
+                loss.backward()
                 optimizer.step()
+                optimizer.zero_grad()
 
                 if (e+1) % (epochs/10) == 0:
                     # Run against test set
                     c_true, o_true = self.test(model)
                     logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, i, c_true, o_true))
-
-            # Free up memory on GPU
-            del model
 
         logging.info('Finish training')
 
