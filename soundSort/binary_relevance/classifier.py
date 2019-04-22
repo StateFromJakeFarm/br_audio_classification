@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,6 +16,7 @@ train_class_pct = 0.5
 file_duration = 4
 num_rec_layers = 2
 sr = 16000
+save_dir = '256d_4s_16k_1000e'
 
 class Classifier:
     '''
@@ -61,10 +63,13 @@ class Classifier:
 
             return x
 
-    def __init__(self, audio_dir, hidden_size, batch_size, lr=0.005, device_id=None, train_class_pct=0.5):
+    def __init__(self, audio_dir, hidden_size, batch_size, save_dir, lr=0.005, device_id=None, train_class_pct=0.5):
         logging.info('Initializing data manager')
         self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         self.batch_size = batch_size
+
+        # Whether or not we'll be saving snapshots of models during training
+        self.save_chkpt = (save_dir is not None)
 
         # Loss function used during training
         self.loss_function = nn.L1Loss()
@@ -102,11 +107,14 @@ class Classifier:
             # Optimizers specific to each model
             self.optimizers.append(optim.SGD(model.parameters(), lr=lr))
 
-    def test(self, model):
+            # Create model's save directory
+            if save_dir is not None:
+                os.makedirs(os.path.join('saved_models', save_dir, str(label)))
+
+    def test(self, model, save_path=None):
         '''
         Determine a model's accuracy against testing set
         '''
-        model.test()
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
@@ -130,6 +138,10 @@ class Classifier:
                 elif i % 10:
                     print('NOT: {}'.format(output[i][0].item()))
 
+        if save_path is not None:
+            # Save model
+            torch.save(model.state_dict(), save_path)
+
         return c_true, o_true
 
     def train(self, epochs):
@@ -143,7 +155,6 @@ class Classifier:
             optimizer = self.optimizers[i]
 
             for e in range(epochs):
-                model.train()
                 model.zero_grad()
 
                 # Retrieve batch
@@ -172,7 +183,13 @@ class Classifier:
 
                 if (e+1) % (epochs/10) == 0:
                     # Run against test set
-                    c_true, o_true = self.test(model)
+                    if self.save_chkpt:
+                        # Save a snapshot
+                        save_path = os.path.join('saved_models', save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
+                    else:
+                        save_path = None
+
+                    c_true, o_true = self.test(model, save_path=save_path)
                     logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, i, c_true, o_true))
 
         logging.info('Finish training')
@@ -189,7 +206,7 @@ if __name__ == '__main__':
             device_id = None
 
         # Train classifier
-        classifier = Classifier(argv[1], hidden_dim, batch_dim, lr=lr, device_id=device_id, train_class_pct=train_class_pct)
+        classifier = Classifier(argv[1], hidden_dim, batch_dim, save_dir, lr=lr, device_id=device_id, train_class_pct=train_class_pct)
         classifier.train(epochs)
     else:
         print('USAGE: classifier.py <path to audio dir> [comma-separated GPU ids]', file=stderr)
