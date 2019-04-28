@@ -121,32 +121,27 @@ class Classifier:
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
-        c_true, o_true = 0, 0
         #num_batches = num_test_files//self.batch_size
         num_batches = 1
+        abs_diff = 0
         for i in range(num_batches):
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
             batch.to(self.device)
-            labels_tensor = torch.Tensor([float(label == model.label) for label in labels])
+            labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
             # Run model
             output = model(batch)
 
-            # Get number of mislabeled files
-            c_true += torch.sum(labels_tensor).item()
-            o_true += torch.sum(torch.round(output)).item()
-            for i, label in enumerate(labels_tensor):
-                if label:
-                    logging.info(output[i].item())
-                else:
-                    logging.info('NOT: {} ({})'.format(output[i].item(), labels[i]))
+            # Calculate accuracy
+            output_rounded = torch.round(output.t())
+            abs_diff += (labels_tensor - output_rounded).abs().sum().item()
 
         if save_path is not None:
             # Save model
             torch.save(model.state_dict(), save_path)
 
-        return c_true, o_true
+        return 1 - (abs_diff / (batch.size()[0]*num_batches))
 
     def train(self, epochs):
         logging.info('Begin training')
@@ -193,8 +188,8 @@ class Classifier:
                     else:
                         save_path = None
 
-                    c_true, o_true = self.test(model, save_path=save_path)
-                    logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, model.label, c_true, o_true))
+                    accuracy = self.test(model, save_path=save_path) * 100
+                    logging.info('({}/{}) model {}: accuracy = {}%'.format(e+1, epochs, model.label, accuracy))
 
             # Free up memory
             del model
