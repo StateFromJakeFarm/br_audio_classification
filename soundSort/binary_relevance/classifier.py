@@ -3,20 +3,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import logging
+import argparse
 
 from UrbanSoundDataManager import UrbanSoundDataManager
-from sys import argv, stderr, getsizeof
-
-# Model params
-hidden_dim = 256
-batch_dim = 256
-lr = 0.005
-epochs = 1000
-train_class_pct = 0.5
-file_duration = 4
-num_rec_layers = 2
-sr = 16000
-save_dir = '256d_4s_16k_1000e'
+from sys import argv, stderr
+from os.path import join
 
 class Classifier:
     '''
@@ -28,26 +19,28 @@ class Classifier:
         Model used to identify each class
         '''
         def init_state_tensors(self):
-            self.h = torch.randn(num_rec_layers, self.batch_size, self.hidden_size).to(self.device)
-            self.c = torch.randn(num_rec_layers, self.batch_size, self.hidden_size).to(self.device)
+            self.h = torch.zeros(self.num_recurrent, self.batch_size, self.hidden_size).to(self.device)
 
-        def __init__(self, input_size, hidden_size, batch_size, chunks, chunk_len, label, device):
+        def __init__(self, input_size, hidden_size, batch_size, num_recurrent, chunks, chunk_len, label, device):
             super(Classifier.Model, self).__init__()
 
             self.hidden_size = hidden_size
             self.batch_size = batch_size
+            self.num_recurrent = num_recurrent
             self.chunks = chunks
             self.chunk_len = chunk_len
             self.label = label
             self.device = device
 
             # Define model
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers=num_rec_layers, batch_first=True)
-            self.linear_portion = nn.Sequential(
+            self.preprocessor = nn.Sequential(
+                nn.Linear(input_size, hidden_size),
+                nn.Tanh(),
                 nn.Linear(hidden_size, hidden_size),
-                nn.Sigmoid(),
-                nn.Linear(hidden_size, hidden_size),
-                nn.Sigmoid(),
+                nn.Tanh(),
+            )
+            self.gru = nn.GRU(hidden_size, hidden_size, num_layers=num_recurrent, batch_first=True)
+            self.postprocessor = nn.Sequential(
                 nn.Linear(hidden_size, 1),
                 nn.Sigmoid()
             )
@@ -57,22 +50,32 @@ class Classifier:
 
         def forward(self, x):
             # Run network
-            x, state_tuple = self.lstm(x, (self.h, self.c))
-            self.h, self.c = state_tuple
-            x = self.linear_portion.forward(x[:, -1, :])
+            x = self.preprocessor(x)
+            x, self.h = self.gru(x, self.h)
+            return self.postprocessor(self.h)[0]
 
-            return x
-
-    def __init__(self, audio_dir, hidden_size, batch_size, save_dir, lr=0.005, device_id=None, train_class_pct=0.5):
+    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, save):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(audio_dir, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+        self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         self.batch_size = batch_size
 
         # Whether or not we'll be saving snapshots of models during training
-        self.save_chkpt = (save_dir is not None)
+        self.save = save
+        if save:
+            # Create directory for saving output
+            self.save_dir = '{}h_{}r_{}sr'.format(hidden_size, num_recurrent, sr)
+
+            # Log script output to file
+            full_save_path = join('saved_models', self.save_dir)
+            os.makedirs(full_save_path)
+
+            handler = logging.FileHandler(join(full_save_path, 'output.log'))
+            formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+            handler.setFormatter(formatter)
+            logging.getLogger().addHandler(handler)
 
         # Loss function used during training
-        self.loss_function = nn.L1Loss()
+        self.loss_function = nn.MSELoss()
 
         # Determine device for training
         self.use_cuda = (torch.cuda.device_count() > 1)
@@ -91,7 +94,7 @@ class Classifier:
         self.models = []
         self.optimizers = []
         for label in range(len(self.dm.classes)):
-            model = self.Model(self.dm.chunk_len, hidden_size, batch_size, self.dm.chunks, self.dm.chunk_len, label, self.device)
+            model = self.Model(self.dm.chunk_len, hidden_size, batch_size, num_recurrent, self.dm.chunks, self.dm.chunk_len, label, self.device)
             model.float()
 
             if self.use_cuda:
@@ -105,11 +108,11 @@ class Classifier:
             self.models.append(model)
 
             # Optimizers specific to each model
-            self.optimizers.append(optim.SGD(model.parameters(), lr=lr))
+            self.optimizers.append(optim.Adam(model.parameters(), lr=lr))
 
-            # Create model's save directory
-            if save_dir is not None:
-                os.makedirs(os.path.join('saved_models', save_dir, str(label)))
+            if self.save:
+                # Create model's save directory
+                os.makedirs(join('saved_models', self.save_dir, str(label)))
 
     def test(self, model, save_path=None):
         '''
@@ -119,7 +122,8 @@ class Classifier:
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
         c_true, o_true = 0, 0
-        num_batches = num_test_files//self.batch_size
+        #num_batches = num_test_files//self.batch_size
+        num_batches = 1
         for i in range(num_batches):
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
@@ -132,11 +136,11 @@ class Classifier:
             # Get number of mislabeled files
             c_true += torch.sum(labels_tensor).item()
             o_true += torch.sum(torch.round(output)).item()
-            for i in range(len(labels)):
-                if labels[i]:
-                    print(output[i][0].item())
-                elif i % 10:
-                    print('NOT: {}'.format(output[i][0].item()))
+            for i, label in enumerate(labels_tensor):
+                if label:
+                    logging.info(output[i].item())
+                else:
+                    logging.info('NOT: {} ({})'.format(output[i].item(), labels[i]))
 
         if save_path is not None:
             # Save model
@@ -171,7 +175,7 @@ class Classifier:
                 output = model(batch)
 
                 # Determine correct output for this batch
-                correct_output = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
+                correct_output = torch.reshape(torch.Tensor([float(label == model.label) for label in labels]), (self.batch_size, 1)).to(self.device)
 
                 # Calculate loss
                 loss = self.loss_function(output, correct_output)
@@ -183,31 +187,51 @@ class Classifier:
 
                 if (e+1) % (epochs/10) == 0:
                     # Run against test set
-                    if self.save_chkpt:
+                    if self.save:
                         # Save a snapshot
-                        save_path = os.path.join('saved_models', save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
+                        save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
                     else:
                         save_path = None
 
                     c_true, o_true = self.test(model, save_path=save_path)
-                    logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, i, c_true, o_true))
+                    logging.info('({}/{}) model {}: c_true = {} o_true = {}'.format(e+1, epochs, model.label, c_true, o_true))
+
+            # Free up memory
+            del model
 
         logging.info('Finish training')
 
 if __name__ == '__main__':
-    if len(argv) in [2, 3]:
-        # Set log level
-        logging.getLogger().setLevel(logging.INFO)
+    # Create argument parser for easier CLI
+    parser = argparse.ArgumentParser(description='Binary classifier models for UrbanSound classification',
+        prog='classifier.py')
+    parser.add_argument('-p', '--path', type=str, required=True,
+        help='path to UrbanSound[8K] dataset')
+    parser.add_argument('--hidden', type=int, required=True,
+        help='dimension of hidden internal layers of network')
+    parser.add_argument('-b', '--batch', type=int, required=True,
+        help='batch size for training and testing')
+    parser.add_argument('-l', '--lr', type=float, default=0.005,
+        help='learning rate')
+    parser.add_argument('-e', '--epochs', type=int, required=True,
+        help='number of training epochs')
+    parser.add_argument('-t', '--target', type=float, default=0.5,
+        help='fraction of training set to be of target class (accomplished by resampling target class to correct imbalance)')
+    parser.add_argument('-d', '--duration', type=float, default=2,
+        help='number of seconds used from each file in dataset (those shorter are zero-padded)')
+    parser.add_argument('-r', '--recurrent', type=int, default=3,
+        help='number of recurrent layers in each model')
+    parser.add_argument('--sr', type=int, default=16000,
+        help='sample rate at which files are loaded')
+    parser.add_argument('-s', '--save', action='store_true', default=False,
+        help='flag to save network and log output')
+    parser.add_argument('-c', '--card', type=int, default=None,
+        help='index of CUDA-capable GPU to be used for training and testing')
+    args = parser.parse_args()
 
-        # Determine if user selected GPUs to use for training
-        if len(argv) == 3:
-            device_id = argv[2]
-        else:
-            device_id = None
+    # Set log level to info
+    logging.getLogger().setLevel(logging.INFO)
 
-        # Train classifier
-        classifier = Classifier(argv[1], hidden_dim, batch_dim, save_dir, lr=lr, device_id=device_id, train_class_pct=train_class_pct)
-        classifier.train(epochs)
-    else:
-        print('USAGE: classifier.py <path to audio dir> [comma-separated GPU ids]', file=stderr)
-        exit(1)
+    # Create and train classifier
+    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target, args.save)
+    classifier.train(args.epochs)

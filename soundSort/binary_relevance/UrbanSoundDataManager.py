@@ -32,18 +32,19 @@ class UrbanSoundDataManager:
         ]
 
         # Determine which fold will be used as test set; all others used for training
+        folds = 10
         if test_fold is None:
-            self.test_fold = random.randint(1, 10)
+            self.test_fold = random.randint(1, folds)
         elif 1 <= test_fold and test_fold <= 10:
             self.test_fold = test_fold
         else:
-            raise ValueError('test_fold must be in range [1, 10]')
+            raise ValueError('test_fold must be in range [1, {}]'.format(folds))
 
         # Compile lists of all training and testing file paths
         train_set_class_counts = [0 for c in self.classes]
         train_files = []
         self.test_files = []
-        for fold_num in range(1, 11):
+        for fold_num in range(1, folds+1):
             fold = 'fold' + str(fold_num)
             fold_path = os.path.join(audio_dir, fold)
             for f_name in os.listdir(fold_path):
