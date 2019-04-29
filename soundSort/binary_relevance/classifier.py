@@ -122,7 +122,7 @@ class Classifier:
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
         num_batches = num_test_files//self.batch_size
-        abs_diff = 0
+        abs_diff, false_pos, false_neg = 0, 0, 0
         for i in range(num_batches):
             # Get testing batch
             batch, labels = self.dm.get_batch('test', size=self.batch_size)
@@ -145,7 +145,6 @@ class Classifier:
             output_rounded = torch.round(output.t())
             diff = (labels_tensor - output_rounded)
 
-            abs_diff, false_pos, false_neg = 0, 0, 0
             for v in diff[0]:
                 v = v.item()
                 abs_diff += abs(v)
