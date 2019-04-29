@@ -121,8 +121,7 @@ class Classifier:
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
-        #num_batches = num_test_files//self.batch_size
-        num_batches = 1
+        num_batches = num_test_files//self.batch_size
         abs_diff = 0
         for i in range(num_batches):
             # Get testing batch
@@ -130,18 +129,38 @@ class Classifier:
             batch.to(self.device)
             labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
+            # Wipe state clean for next file (gross way to do it)
+            try:
+                model.module.init_state_tensors()
+            except AttributeError:
+                model.init_state_tensors()
+
             # Run model
             output = model(batch)
 
+            # Free up memory
+            del batch
+
             # Calculate accuracy
             output_rounded = torch.round(output.t())
-            abs_diff += (labels_tensor - output_rounded).abs().sum().item()
+            diff = (labels_tensor - output_rounded)
+
+            abs_diff, false_pos, false_neg = 0, 0, 0
+            for v in diff[0]:
+                v = v.item()
+                abs_diff += abs(v)
+                false_pos += -1 * min(0, v)
+                false_neg += max(0, v)
 
         if save_path is not None:
             # Save model
             torch.save(model.state_dict(), save_path)
 
-        return 1 - (abs_diff / (batch.size()[0]*num_batches))
+        false_pos = float(false_pos)/abs_diff
+        false_neg = float(false_neg)/abs_diff
+        accuracy = 1 - (abs_diff / (self.batch_size*num_batches))
+
+        return accuracy*100, false_pos*100, false_neg*100
 
     def train(self, epochs):
         logging.info('Begin training')
@@ -169,6 +188,9 @@ class Classifier:
                 # Run network
                 output = model(batch)
 
+                # Free up memory
+                del batch
+
                 # Determine correct output for this batch
                 correct_output = torch.reshape(torch.Tensor([float(label == model.label) for label in labels]), (self.batch_size, 1)).to(self.device)
 
@@ -188,8 +210,8 @@ class Classifier:
                     else:
                         save_path = None
 
-                    accuracy = self.test(model, save_path=save_path) * 100
-                    logging.info('({}/{}) model {}: accuracy = {}%'.format(e+1, epochs, model.label, accuracy))
+                    accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
+                    logging.info('({}/{}) model {}: accuracy = {}% ({}% false positive, {}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
 
             # Free up memory
             del model
