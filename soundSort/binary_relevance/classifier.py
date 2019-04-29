@@ -175,7 +175,7 @@ class Classifier:
             optimizer = self.optimizers[i]
 
             for e in range(epochs):
-                for i in range(batches_per_epoch):
+                for b in range(batches_per_epoch):
                     model.zero_grad()
 
                     # Retrieve batch
