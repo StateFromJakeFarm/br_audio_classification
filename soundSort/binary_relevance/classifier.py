@@ -121,7 +121,7 @@ class Classifier:
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
-        num_batches = num_test_files//self.batch_size
+        num_batches = num_test_files / self.batch_size
         abs_diff, false_pos, false_neg = 0, 0, 0
         for i in range(num_batches):
             # Get testing batch
@@ -164,6 +164,9 @@ class Classifier:
     def train(self, epochs):
         logging.info('Begin training')
 
+        batches_per_epoch = self.dm.num_train_files // self.batch_size
+
+        # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
             # Move model to training device
             model.to(self.device)
@@ -172,34 +175,35 @@ class Classifier:
             optimizer = self.optimizers[i]
 
             for e in range(epochs):
-                model.zero_grad()
+                for i in range(batches_per_epoch):
+                    model.zero_grad()
 
-                # Retrieve batch
-                batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
-                batch.to(self.device)
+                    # Retrieve batch
+                    batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
+                    batch.to(self.device)
 
-                # Wipe state clean for next file (gross way to do it)
-                try:
-                    model.module.init_state_tensors()
-                except AttributeError:
-                    model.init_state_tensors()
+                    # Wipe state clean for next file (gross way to do it)
+                    try:
+                        model.module.init_state_tensors()
+                    except AttributeError:
+                        model.init_state_tensors()
 
-                # Run network
-                output = model(batch)
+                    # Run network
+                    output = model(batch)
 
-                # Free up memory
-                del batch
+                    # Free up memory
+                    del batch
 
-                # Determine correct output for this batch
-                correct_output = torch.reshape(torch.Tensor([float(label == model.label) for label in labels]), (self.batch_size, 1)).to(self.device)
+                    # Determine correct output for this batch
+                    correct_output = torch.reshape(torch.Tensor([float(label == model.label) for label in labels]), (self.batch_size, 1)).to(self.device)
 
-                # Calculate loss
-                loss = self.loss_function(output, correct_output)
+                    # Calculate loss
+                    loss = self.loss_function(output, correct_output)
 
-                # Backpropagate
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+                    # Backpropagate
+                    loss.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
 
                 if (e+1) % (epochs/10) == 0:
                     # Run against test set

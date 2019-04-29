@@ -63,17 +63,18 @@ class UrbanSoundDataManager:
 
         # (Likely) Overselect the class being trained for on each model because
         # dataset is very unbalanced
+        self.num_train_files = len(train_files)
         self.train_files_by_class = []
         for c in range(len(self.classes)):
             # True files must account for train_class_pct of training set
             p_true = train_class_pct/train_set_class_counts[c]
             # False files must account for (1 - train_class_pct) of training set
-            p_false = (1 - train_class_pct)/(len(train_files) - train_set_class_counts[c])
+            p_false = (1 - train_class_pct)/(self.num_train_files - train_set_class_counts[c])
 
             p = [p_true if self.get_label(f) == c else p_false for f in train_files]
 
             # Select training set
-            self.train_files_by_class.append(np.random.choice(train_files, size=len(train_files),
+            self.train_files_by_class.append(np.random.choice(train_files, size=self.num_train_files,
                 replace=True, p=p))
 
         # Batch size details
