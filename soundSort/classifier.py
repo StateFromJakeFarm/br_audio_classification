@@ -175,7 +175,7 @@ class Classifier:
             optimizer = self.optimizers[i]
 
             for e in range(epochs):
-                for b in range(batches_per_epoch):
+                for _ in range(batches_per_epoch):
                     model.zero_grad()
 
                     # Retrieve batch
@@ -205,16 +205,15 @@ class Classifier:
                     optimizer.step()
                     optimizer.zero_grad()
 
-                if (e+1) % (epochs/10) == 0:
-                    # Run against test set
-                    if self.save:
-                        # Save a snapshot
-                        save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
-                    else:
-                        save_path = None
+                # Run against test set
+                if self.save:
+                    # Save a snapshot
+                    save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
+                else:
+                    save_path = None
 
-                    accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
-                    logging.info('({}/{}) model {}: accuracy = {}% ({}% false positive, {}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
+                accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
+                logging.info('({}/{}) model {}: accuracy = {}% ({}% false positive, {}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
 
             # Free up memory
             del model

@@ -81,7 +81,7 @@ class UrbanSoundDataManager:
         self.file_duration = file_duration
         self.chunks = int(file_duration/chunk_duration)
         self.chunk_len = int(chunk_duration*self.sr)
-        self.total_samples = self.sr*file_duration
+        self.samples_per_file = self.sr*file_duration
 
         # Iterators to keep track of where we are in the training and testing sets
         self.i_train = [0 for c in self.classes]
@@ -123,9 +123,9 @@ class UrbanSoundDataManager:
             # Load data
             Y, sr = librosa.core.load(file, sr=self.sr, duration=self.file_duration)
 
-            if Y.shape[0] < self.total_samples:
+            if Y.shape[0] < self.samples_per_file:
                 # Pad this array with zeros on the end
-                Y = np.pad(Y, (0, int(self.total_samples-Y.shape[0])), 'constant')
+                Y = np.pad(Y, (0, int(self.samples_per_file-Y.shape[0])), 'constant')
 
             # Chunk-up data
             for chunk in range(self.chunks):

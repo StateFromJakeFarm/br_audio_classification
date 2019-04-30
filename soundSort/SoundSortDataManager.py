@@ -1,4 +1,5 @@
 import os
+import torch
 import librosa
 import logging
 import numpy as np
@@ -8,50 +9,116 @@ from sys import stderr
 from pydub import AudioSegment
 from random import shuffle
 
-class SoundSortDataManager():
+class SoundSortDataManager:
     '''
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, data_dir, auth_json_path, bucket_name, sr=16000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
+    def __init__(self, data_dir_path, auth_json_path, bucket_name, classes, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
         # Local directory for all audio files
-        self.data_dir = data_dir
-
-        # Sample rate at which to load files
-        self.sample_rate = sample_rate
+        self.data_dir_path = data_dir_path
 
         # Max seconds of audio to load for each file
-        self.duration = duration
+        self.file_duration = file_duration
 
-        # List to store NumPy arrays containing sound data
-        self.data = []
+        # Sample rate
+        self.sr = sr
+
+        # Classes for each sample
+        self.classes = classes + ['other']
 
         # Keep track of terms associated with each file
         self.file_terms = []
+
+        # Calculate file data dimensions
+        self.file_duration = file_duration
+        self.samples_per_file = self.sr*file_duration
+        self.chunks = int(file_duration/chunk_duration)
+        self.chunk_len = int(chunk_duration*self.sr)
 
         self.i = 0 # Current file
         self.j = 0 # Next sample
 
         # Get authorization JSON
-        if os.path.isfile(auth_json):
-            try:
-                client = storage.Client.from_service_account_json(auth_json)
-                self.bucket = client.get_bucket(bucket)
-            except:
-                logging.error('Could not login to service account')
-                exit(1)
+        if os.path.isfile(auth_json_path):
+            client = storage.Client.from_service_account_json(auth_json_path)
+            self.bucket = client.get_bucket(bucket_name)
         else:
-            logging.error('{} does not exist'.format(auth_json))
+            logging.error('{} does not exist'.format(auth_json_path))
             exit(1)
 
         # Create storage directory if it does not exist
-        if not os.path.isdir(self.data_dir):
-            try:
-                logging.info('Creating {}'.format(self.data_dir))
-                os.mkdir(self.data_dir)
-            except:
-                logging.error('Could not create {}'.format(self.data_dir))
-                exit(1)
+        if not os.path.isdir(self.data_dir_path):
+            logging.debug('Creating {}'.format(self.data_dir_path))
+            os.makedirs(self.data_dir_path)
+
+        # Keep track of each file's class
+        files = []
+        self.file_classes = {}
+
+        # Determine which files within the bucket we already have downloaded and
+        # which we need to download now
+        logging.debug('Getting list of local files')
+        local_files  = os.listdir(self.data_dir_path)
+        logging.debug('Getting list of remote files')
+        for blob in self.list():
+            remote_name_no_ext = blob.name.split('.')[0]
+            dest_path = os.path.join(self.data_dir_path, remote_name_no_ext + '.wav')
+            if remote_name_no_ext + '.wav' not in local_files:
+                # We don't have this file (or a WAV version of it)
+                local_path = os.path.join(self.data_dir_path, blob.name)
+
+                # Download from GCP storage
+                logging.debug('Downloading {}'.format(blob.name))
+                self.download(blob.name, local_path)
+
+                if local_path.split('.')[-1] != 'wav':
+                    # File is not in WAV format, convert and delete original
+                    logging.debug('Converting {} to WAV format'.format(blob.name))
+
+                    self.convert_wav(local_path, dest_path)
+                    os.remove(local_path)
+
+            # Assign file to class based on search terms it contains (this is
+            # done greedily, so if the file matches multiple classes, it will be
+            # placed in the class of the first search term it matches)
+            file_terms = self.get_terms(dest_path)
+            for i, c in enumerate(self.classes):
+                if c in file_terms or c == 'other':
+                    self.file_classes[dest_path] = i
+                    break
+
+            files.append(dest_path)
+
+        # Designate 75% of files for training and the rest for testing
+        shuffle(files)
+        self.num_train_files = int(len(files)*0.75)
+        train_files = files[:self.num_train_files]
+        self.test_files = files[self.num_train_files:]
+
+        # Count how many occurrences of each class are in training set
+        train_set_class_counts = [0 for c in self.classes]
+        for f in train_files:
+            train_set_class_counts[self.file_classes[f]] += 1
+
+        # (Likely) Overselect the class being trained for on each model because
+        # dataset is very unbalanced
+        self.train_files_by_class = []
+        for c in range(len(self.classes)):
+            # True files must account for train_class_pct of training set
+            p_true = train_class_pct/train_set_class_counts[c]
+            # False files must account for (1 - train_class_pct) of training set
+            p_false = (1 - train_class_pct)/(self.num_train_files - train_set_class_counts[c])
+
+            p = [p_true if self.file_classes[f] == c else p_false for f in train_files]
+
+            # Select training set
+            self.train_files_by_class.append(np.random.choice(train_files, size=self.num_train_files,
+                replace=True, p=p))
+
+        # Iterators to keep track of where we are in the training and testing sets
+        self.i_train = [0 for c in self.classes]
+        self.i_test = 0
 
     def list(self):
         '''
@@ -63,7 +130,7 @@ class SoundSortDataManager():
         '''
         Download a file from bucket to local disk.
         '''
-        logging.info('Saving {} from GCS bucket {} to {} locally'.format(gcs_path, self.bucket.name, local_path))
+        logging.debug('Saving {} from GCS bucket {} to {} locally'.format(gcs_path, self.bucket.name, local_path))
 
         blob = self.bucket.blob(gcs_path)
         blob.download_to_filename(local_path)
@@ -73,7 +140,7 @@ class SoundSortDataManager():
         Convert file at src_path to WAV format and save converted file at
         dest_path.
         '''
-        logging.info('Converting {} to {}'.format(src_path, dest_path))
+        logging.debug('Converting {} to {}'.format(src_path, dest_path))
 
         ext = src_path.split('.')[-1].strip()
         {
@@ -82,113 +149,58 @@ class SoundSortDataManager():
             'flv': AudioSegment.from_flv,
         }.get(ext)(src_path).export(dest_path, 'wav')
 
-    def extract_features(self, file_path, cepstra=26):
+    def get_batch(self, type, size=10, train_class=None, use_fft=False):
         '''
-        Extract features from file.
+        Get next batch of shape (batch, seq_len, seq), which is representative
+        of (file, chunks, chunk_len)
         '''
-        try:
-            Y, sr = librosa.load(file_path)
-            if self.rnn:
-                return librosa.feature.mfcc(y=Y, sr=sr, n_mfcc=cepstra)
+        # Gross hack to actually increment the iterator for the set being used
+        if type == 'train':
+            if train_class is not None and train_class in [c for c in range(len(self.classes))]:
+                file_set = self.train_files_by_class[train_class]
+                iterator = self.i_train[train_class]
+
+                # Increment iterator
+                self.i_train[train_class] += size
+                if self.i_train[train_class] + size >= len(self.train_files_by_class[train_class]):
+                    self.i_train[train_class] = 0
             else:
-                stft = np.abs(librosa.stft(Y))
-                mfccs = np.mean(librosa.feature.mfcc(y=Y, sr=sr, n_mfcc=40).T,axis=0)
-                chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sr).T,axis=0)
-                mel = np.mean(librosa.feature.melspectrogram(Y, sr=sr).T,axis=0)
-                contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sr).T,axis=0)
-                tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(Y), sr=sr).T,axis=0)
-
-                return np.concatenate([mfccs, chroma, mel, contrast, tonnetz])
-        except Exception as e:
-            logging.warning('Failed to extract features from {}: {}'.format(file_path, e))
-            return np.empty(0)
-
-    def load_file(self, file_path, duration):
-        '''
-        Load a sound file
-        '''
-        try:
-            self.file_terms.append(set(file_path.split('_')[0].split('-')))
-            file_path = os.path.join(self.data_dir, file_path)
-            logging.info('loading {}'.format(file_path))
-
-            y, sr = librosa.load(file_path, sr=self.sample_rate, duration=duration)
-            self.data.append(y)
-        except Exception as e:
-            logging.error('Failed to load {}: {}'.format(file_path, e))
-
-    def prep_data(self, num_files=None, file_name=None):
-        '''
-        Load training files
-        '''
-        # Determine which files within the bucket we already have downloaded and
-        # which we need to download now
-        logging.info('Getting list of local files')
-        local_files  = os.listdir(self.data_dir)
-        logging.info('Getting list of remote files')
-        remote_blobs = self.list()
-        for blob in remote_blobs:
-            remote_name_no_ext = blob.name.split('.')[0]
-            if remote_name_no_ext + '.wav' not in local_files:
-                # We don't have this file (or a WAV version of it)
-                local_path = self.data_dir + '/' + blob.name
-                dest_path  = self.data_dir + '/' + remote_name_no_ext + '.wav'
-
-                # Download from GCP storage
-                logging.info('Downloading {}'.format(blob.name))
-                self.download(blob.name, local_path)
-
-                if local_path.split('.')[-1] != 'wav':
-                    # File is not in WAV format, convert and delete original
-                    logging.info('Converting {} to WAV format'.format(blob.name))
-
-                    self.convert_wav(local_path, dest_path)
-                    os.remove(local_path)
-
-        # Load sound data into list of np.array objects
-        if file_name:
-            # If user wants one specific file, only load that one
-            self.load_file(file_name, self.duration)
+                raise ValueError('train_class must be in the range [0, 9]')
         else:
-            for i, file_path in enumerate(os.listdir(self.data_dir)):
-                if num_files and i >= num_files:
-                    # We've prepped all the files the user wanted
-                    break
+            file_set = self.test_files
+            iterator = self.i_test
 
-                self.load_file(file_path, self.duration)
+            # Increment iterator
+            self.i_test += size
+            if self.i_test + size >= len(self.test_files):
+                self.i_test = 0
 
-    def next_file(self):
-        '''
-        Move to next file in dataset
-        '''
-        self.i += 1
-        if self.i >= len(self.data):
-            self.i = 0
+        # Compile file data for this chunk into tensor
+        batch = np.zeros((size, self.chunks, self.chunk_len), dtype=float)
+        labels = []
+        for i, f in enumerate(file_set[iterator:iterator+size]):
+            # Extract label
+            labels.append(self.file_classes[f])
 
-    def next_chunk(self, sec=1):
-        '''
-        Serve next chunk of samples
-        '''
-        chunk_size = self.sample_rate * sec
-        chunk = self.data[self.i][self.j:self.j+chunk_size]
-        self.j += chunk_size
+            # Load data
+            Y, sr = librosa.core.load(f, sr=self.sr, duration=self.file_duration)
 
-        if (self.j+chunk_size)/self.sample_rate > self.duration:
-            self.j = 0
+            if Y.shape[0] < self.samples_per_file:
+                # Pad this array with zeros on the end
+                Y = np.pad(Y, (0, int(self.samples_per_file-Y.shape[0])), 'constant')
 
-        return chunk
+            # Chunk-up data
+            for chunk in range(self.chunks):
+                batch[i][chunk] = Y[chunk*self.chunk_len:chunk*self.chunk_len+self.chunk_len]
 
-    def get_file_terms(self):
-        '''
-        Return set of terms identified by scraper when file was discovered
-        '''
-        return self.file_terms[self.i]
+                if use_fft:
+                    # Use FFT of chunk
+                    batch[i][chunk] = fft(batch[i][chunk]).real
 
-    def next_chunk_and_label(self, target_term):
+        return torch.from_numpy(batch.astype(np.float32)), labels
+
+    def get_terms(self, file_path):
         '''
-        Return tuple of (chunk, 1/0) where the second element is a boolean
-        denoting whether or not the file's description contains the
-        target term
+        Return terms associated with file
         '''
-        has_term = int(1 if target_term in get_file_terms() else 0)
-        return (self.next_chunk(), np.array([has_term]))
+        return set(os.path.split(file_path)[1].split('_')[0].split('-'))
