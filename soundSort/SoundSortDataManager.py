@@ -8,12 +8,12 @@ from sys import stderr
 from pydub import AudioSegment
 from random import shuffle
 
-class SoundSortDataManager(object):
+class SoundSortDataManager():
     '''
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, data_dir, auth_json, bucket, sample_rate=160000, duration=120):
+    def __init__(self, data_dir, auth_json_path, bucket_name, sr=16000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
         # Local directory for all audio files
         self.data_dir = data_dir
 

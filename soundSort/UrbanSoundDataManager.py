@@ -10,7 +10,7 @@ class UrbanSoundDataManager:
     '''
     Load files from UrbanSound8K dataset for training and testing
     '''
-    def __init__(self, audio_dir, test_fold=None, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.4):
+    def __init__(self, audio_dir, test_fold=None, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
         '''
         Constructor
         '''
