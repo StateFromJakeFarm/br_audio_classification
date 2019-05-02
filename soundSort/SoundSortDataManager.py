@@ -25,7 +25,8 @@ class SoundSortDataManager:
         self.sr = sr
 
         # Classes for each sample
-        self.classes = classes + ['other']
+        self.classes = classes
+        logging.info('Classes: {}'.format(str(classes)))
 
         # Keep track of terms associated with each file
         self.file_terms = []
@@ -83,7 +84,7 @@ class SoundSortDataManager:
             # done greedily, so if the file matches multiple classes, it will be
             # placed in the class of the first search term it matches)
             file_terms = self.get_terms(dest_path)
-            for i, c in enumerate(self.classes):
+            for i, c in enumerate(self.classes + ['other']):
                 if c in file_terms or c == 'other':
                     self.file_classes[dest_path] = i
                     break
@@ -97,7 +98,7 @@ class SoundSortDataManager:
         self.test_files = files[self.num_train_files:]
 
         # Count how many occurrences of each class are in training set
-        train_set_class_counts = [0 for c in self.classes]
+        train_set_class_counts = [0 for c in self.classes + ['other']]
         for f in train_files:
             train_set_class_counts[self.file_classes[f]] += 1
 

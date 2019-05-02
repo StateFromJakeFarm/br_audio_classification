@@ -6,6 +6,7 @@ import logging
 import argparse
 
 from UrbanSoundDataManager import UrbanSoundDataManager
+from SoundSortDataManager import SoundSortDataManager
 from sys import argv, stderr
 from os.path import join
 
@@ -54,10 +55,10 @@ class Classifier:
             x, self.h = self.gru(x, self.h)
             return self.postprocessor(self.h)[0]
 
-    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, save):
+    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save):
         logging.info('Initializing data manager')
-        self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         self.batch_size = batch_size
+        self.min_accuracy = min_accuracy
 
         # Whether or not we'll be saving snapshots of models during training
         self.save = save
@@ -73,6 +74,10 @@ class Classifier:
             formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
             handler.setFormatter(formatter)
             logging.getLogger().addHandler(handler)
+
+        # Init data manager
+        self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+        #self.dm = SoundSortDataManager('soundSortAudio', '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket', ['saw', 'grinder', 'traffic', 'crowd'], train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
 
         # Loss function used during training
         self.loss_function = nn.MSELoss()
@@ -121,7 +126,7 @@ class Classifier:
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
-        num_batches = num_test_files / self.batch_size
+        num_batches = num_test_files // self.batch_size
         abs_diff, false_pos, false_neg = 0, 0, 0
         for i in range(num_batches):
             # Get testing batch
@@ -162,7 +167,7 @@ class Classifier:
         return accuracy*100, false_pos*100, false_neg*100
 
     def train(self, epochs):
-        logging.info('Begin training')
+        logging.info('Begin training ({} epochs)'.format(epochs))
 
         batches_per_epoch = self.dm.num_train_files // self.batch_size
 
@@ -205,15 +210,20 @@ class Classifier:
                     optimizer.step()
                     optimizer.zero_grad()
 
-                # Run against test set
-                if self.save:
-                    # Save a snapshot
-                    save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
-                else:
-                    save_path = None
+                if (e+1) % (epochs//10) == 0:
+                    # Run against test set
+                    if self.save:
+                        # Save a snapshot
+                        save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
+                    else:
+                        save_path = None
 
-                accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
-                logging.info('({}/{}) model {}: accuracy = {}% ({}% false positive, {}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
+                    accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
+                    logging.info('({}/{}) model {}: accuracy = {:.2f}% ({:.2f}% false positive, {:.2f}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
+
+                    if accuracy >= self.min_accuracy*100:
+                        # Model has met minimum criteria, exit now
+                        break
 
             # Free up memory
             del model
@@ -242,6 +252,8 @@ if __name__ == '__main__':
         help='number of recurrent layers in each model')
     parser.add_argument('--sr', type=int, default=16000,
         help='sample rate at which files are loaded')
+    parser.add_argument('-a', '--accuracy', type=float, default=0.9,
+        help='stop training a model as soon as it reaches this accuracy score')
     parser.add_argument('-s', '--save', action='store_true', default=False,
         help='flag to save network and log output')
     parser.add_argument('-c', '--card', type=int, default=None,
@@ -252,5 +264,5 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
 
     # Create and train classifier
-    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target, args.save)
+    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target, args.accuracy, args.save)
     classifier.train(args.epochs)
