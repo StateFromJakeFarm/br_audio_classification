@@ -9,6 +9,8 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
+from os import environ
+
 BOT_NAME = 'soundScrape'
 
 SPIDER_MODULES = ['soundScrape.spiders']
@@ -70,7 +72,7 @@ ITEM_PIPELINES = {
 }
 FILES_STORE = 'gs://soundscrape-bucket/'
 GCS_PROJECT_ID = '874209703659'
-GOOGLE_APPLICATION_CREDENTIALS = '/home/jakeh/repos/research/soundScrape-d78c4b542d68.json'
+GOOGLE_APPLICATION_CREDENTIALS = environ.get('SOUNDSCRAPE_AUTH_JSON')
 
 # Allow offsite links to be followed
 #SPIDER_MIDDLEWARES = {

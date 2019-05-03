@@ -6,6 +6,7 @@ from .gdrive import SheetObj
 from bs4 import BeautifulSoup, NavigableString
 from scrapy.spiders import CrawlSpider
 from nltk.stem.snowball import SnowballStemmer
+from os import environ
 
 class SoundSpider(CrawlSpider):
     '''Scrape sites for sound files'''
@@ -66,7 +67,10 @@ class SoundSpider(CrawlSpider):
     ]
 
     # Access Google Drive
-    auth_json = '../soundScrape-d78c4b542d68.json'
+    auth_json = environ.get('SOUNDSCRAPE_AUTH_JSON')
+    if auth_json is None:
+        raise EnvironmentError('SOUNDSCRAPE_AUTH_JSON must be an environment variable containing path to service account JSON credentials file')
+
     sheet_name = 'soundScrape Dashboard'
 
     # Fraction of words in file name that need to match our search terms

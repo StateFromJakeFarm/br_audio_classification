@@ -55,7 +55,7 @@ class Classifier:
             x, self.h = self.gru(x, self.h)
             return self.postprocessor(self.h)[0]
 
-    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save):
+    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save, gathered):
         logging.info('Initializing data manager')
         self.batch_size = batch_size
         self.min_accuracy = min_accuracy
@@ -64,7 +64,7 @@ class Classifier:
         self.save = save
         if save:
             # Create directory for saving output
-            self.save_dir = '{}h_{}r_{}sr'.format(hidden_size, num_recurrent, sr)
+            self.save_dir = '{}h_{}r_{}sr_{}'.format(hidden_size, num_recurrent, sr, 'soundScrape' if gathered is not None else 'UrbanSound8K')
 
             # Log script output to file
             full_save_path = join('saved_models', self.save_dir)
@@ -76,8 +76,14 @@ class Classifier:
             logging.getLogger().addHandler(handler)
 
         # Init data manager
-        self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
-        #self.dm = SoundSortDataManager('soundSortAudio', '../soundScrape-d78c4b542d68.json', 'soundscrape-bucket', ['saw', 'grinder', 'traffic', 'crowd'], train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+        if gathered is not None:
+            # Use dataset gathered by scraper
+            if os.environ.get('SOUNDSCRAPE_AUTH_JSON') is None:
+                raise EnvironmentError('SOUNDSCRAPE_AUTH_JSON must be an environment variable containing path to service account JSON credentials file')
+            self.dm = SoundSortDataManager(dataset_path, os.environ['SOUNDSCRAPE_AUTH_JSON'], 'soundscrape-bucket', gathered.split(','), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+        else:
+            # Use UrbanSound8K dataset
+            self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
 
         # Loss function used during training
         self.loss_function = nn.MSELoss()
@@ -258,11 +264,14 @@ if __name__ == '__main__':
         help='flag to save network and log output')
     parser.add_argument('-c', '--card', type=int, default=None,
         help='index of CUDA-capable GPU to be used for training and testing')
+    parser.add_argument('-g', '--gathered', type=str, default=None,
+        help='comma-separated classes to identify within dataset gathered by soundScrape')
     args = parser.parse_args()
 
     # Set log level to info
     logging.getLogger().setLevel(logging.INFO)
 
     # Create and train classifier
-    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target, args.accuracy, args.save)
+    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target,
+        args.accuracy, args.save, args.gathered)
     classifier.train(args.epochs)
