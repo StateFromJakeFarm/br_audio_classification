@@ -57,7 +57,6 @@ class Classifier:
             return self.postprocessor(self.h)[0]
 
     def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save, gathered):
-        logging.info('Initializing data manager')
         self.batch_size = batch_size
         self.min_accuracy = min_accuracy
 
@@ -77,6 +76,7 @@ class Classifier:
             logging.getLogger().addHandler(handler)
 
         # Init data manager
+        logging.info('Initializing data manager')
         if gathered is not None:
             # Use dataset gathered by scraper
             if os.environ.get('SOUNDSCRAPE_AUTH_JSON') is None:
