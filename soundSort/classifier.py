@@ -9,6 +9,7 @@ from UrbanSoundDataManager import UrbanSoundDataManager
 from SoundSortDataManager import SoundSortDataManager
 from sys import argv, stderr
 from os.path import join
+from collections import OrderedDict
 
 class Classifier:
     '''
@@ -236,6 +237,87 @@ class Classifier:
 
         logging.info('Finish training')
 
+    def get_latest_save_file(self, saved_classifier_path):
+        '''
+        Return path to the latest (most training epochs) save file for this
+        model
+        '''
+        files = os.listdir(saved_classifier_path)
+
+        return join(saved_classifier_path, max(files, key=lambda f: int(f.split('_')[0])))
+
+    def full_test(self, saved_classifiers_path=None):
+        '''
+        Test entire system by passing entire test set through every classifier,
+        then choosing maximum output value from each classifier as each file's
+        label
+        '''
+        logging.info('Testing accuracy of entire system')
+
+        # Determine number of test files and batches to be used
+        total_test_files = len(self.dm.test_files)
+        num_test_files = total_test_files - (total_test_files % self.batch_size)
+        num_batches = num_test_files // self.batch_size
+
+        # Record all output
+        output = torch.zeros([len(self.dm.classes), num_test_files], dtype=torch.float32)
+        labels = torch.zeros([num_test_files], dtype=torch.int16)
+
+        # Load and test each model
+        for i, c in enumerate(self.dm.classes):
+            logging.info('Running model {} ({})'.format(i, c))
+
+            model = self.models[i]
+            if saved_classifiers_path is not None:
+                # Get latest save file for this model
+                save_file = self.get_latest_save_file(join(saved_classifiers_path, str(i)))
+                logging.debug('Loading {}'.format(save_file))
+
+                # Load model parameters
+                state_dict = torch.load(save_file, map_location=self.device)
+                try:
+                    model.load_state_dict(state_dict)
+                except RuntimeError:
+                    # Model (probably) trained with GPU and we're now trying to load it with a CPU
+                    new_state_dict = OrderedDict()
+                    for k, v in state_dict.items():
+                        new_state_dict[ k[7:] ] = v
+
+                    model.load_state_dict(new_state_dict)
+
+            # Collect all output for testing set
+            model.to(self.device)
+            model.eval()
+            for j in range(num_batches):
+                batch, batch_labels = self.dm.get_batch('test', size=self.batch_size)
+                batch.to(self.device)
+
+                # Wipe state clean for next file (gross way to do it)
+                try:
+                    model.module.init_state_tensors()
+                except AttributeError:
+                    model.init_state_tensors()
+
+                # Record output and labels for this batch
+                output[i][j*self.batch_size:j*self.batch_size+self.batch_size] = model(batch).t()
+                if i == 0:
+                    # No need to overwrite labels with the same data on every pass
+                    labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
+
+                # Free up memory
+                del batch
+
+        # Calculate accuracy
+        output = output.t()
+        correct = 0
+        total = 0
+        for i in range(num_test_files):
+            if labels[i].item() < len(self.dm.classes):
+                total += 1
+                correct += (output[i].argmax().item() == labels[i].item())
+
+        logging.info('Correct: {}/{} ({}% accuracy)'.format(correct, total, float(correct)/total*100))
+
 if __name__ == '__main__':
     # Create argument parser for easier CLI
     parser = argparse.ArgumentParser(description='Binary classifier models for UrbanSound classification',
@@ -246,7 +328,7 @@ if __name__ == '__main__':
         help='dimension of hidden internal layers of network')
     parser.add_argument('-b', '--batch', type=int, required=True,
         help='batch size for training and testing')
-    parser.add_argument('-l', '--lr', type=float, default=0.005,
+    parser.add_argument('--lr', type=float, default=0.005,
         help='learning rate')
     parser.add_argument('-e', '--epochs', type=int, required=True,
         help='number of training epochs')
@@ -266,6 +348,8 @@ if __name__ == '__main__':
         help='index of CUDA-capable GPU to be used for training and testing')
     parser.add_argument('-g', '--gathered', type=str, default=None,
         help='comma-separated classes to identify within dataset gathered by soundScrape')
+    parser.add_argument('-l', '--load', type=str, default=None,
+        help='load and test entire classifier against test set')
     args = parser.parse_args()
 
     # Set log level to info
@@ -274,4 +358,11 @@ if __name__ == '__main__':
     # Create and train classifier
     classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target,
         args.accuracy, args.save, args.gathered)
-    classifier.train(args.epochs)
+
+    if args.load is not None:
+        # Test entire system by running test set through every classifier
+        classifier.full_test(saved_classifiers_path=args.load)
+    else:
+        # Train all classifiers to identify their respective sounds
+        classifier.train(args.epochs)
+        classifier.full_test()
