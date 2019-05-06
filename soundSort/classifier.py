@@ -57,6 +57,7 @@ class Classifier:
             return self.postprocessor(self.h)[0]
 
     def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save, gathered):
+        logging.info('Initializing classifier')
         self.batch_size = batch_size
         self.min_accuracy = min_accuracy
 
