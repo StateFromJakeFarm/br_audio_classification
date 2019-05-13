@@ -150,13 +150,16 @@ class SoundSortDataManager:
             'flv': AudioSegment.from_flv,
         }.get(ext)(src_path).export(dest_path, 'wav')
 
-    def get_batch(self, type, size=10, train_class=None, use_fft=False):
+    def get_batch(self, type, size=10, train_class=None, use_fft=False, single_file=None):
         '''
         Get next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
         '''
         # Gross hack to actually increment the iterator for the set being used
-        if type == 'train':
+        if single_file is not None:
+            file_set = [single_file for f in range(size)]
+            iterator = 0
+        elif type == 'train':
             if train_class is not None and train_class in [c for c in range(len(self.classes))]:
                 file_set = self.train_files_by_class[train_class]
                 iterator = self.i_train[train_class]
@@ -181,7 +184,7 @@ class SoundSortDataManager:
         labels = []
         for i, f in enumerate(file_set[iterator:iterator+size]):
             # Extract label
-            labels.append(self.file_classes[f])
+            #labels.append(self.file_classes[f])
 
             # Load data
             Y, sr = librosa.core.load(f, sr=self.sr, duration=self.file_duration)

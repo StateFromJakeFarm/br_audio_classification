@@ -310,14 +310,56 @@ class Classifier:
 
         # Calculate accuracy
         output = output.t()
-        correct = 0
-        total = 0
+        samples = [0 for c in self.dm.classes]
+        correct = [0 for c in self.dm.classes]
         for i in range(num_test_files):
-            if labels[i].item() < len(self.dm.classes):
-                total += 1
-                correct += (output[i].argmax().item() == labels[i].item())
+            label = labels[i].item()
+            if label < len(self.dm.classes):
+                guess = output[i].argmax().item()
+                samples[label] += 1
+                correct[label] += (guess == label)
 
-        logging.info('Correct: {}/{} ({}% accuracy)'.format(correct, total, float(correct)/total*100))
+        total_samples = sum(samples)
+        total_correct = sum(correct)
+        logging.info('Correct Overall: {}/{} ({:.2f}% accuracy)'.format(total_correct, total_samples, float(total_correct)/total_samples*100))
+
+        # Log accuracy per class
+        for i, c in enumerate(self.dm.classes):
+            logging.info('{}: {}/{} ({:.2f}% accuracy)'.format(c, correct[i], samples[i], float(correct[i])/samples[i]*100))
+
+    def classify_one(self, saved_classifiers_path, file):
+        # Load and test each model
+        output = torch.zeros([len(self.dm.classes)], dtype=torch.float32)
+        for i, c in enumerate(self.dm.classes):
+            logging.info('Running model {} ({})'.format(i, c))
+
+            model = self.models[i]
+            # Get latest save file for this model
+            save_file = self.get_latest_save_file(join(saved_classifiers_path, str(i)))
+            logging.debug('Loading {}'.format(save_file))
+
+            # Load model parameters
+            state_dict = torch.load(save_file, map_location=self.device)
+            try:
+                model.load_state_dict(state_dict)
+            except RuntimeError:
+                # Model (probably) trained with GPU and we're now trying to load it with a CPU
+                new_state_dict = OrderedDict()
+                for k, v in state_dict.items():
+                    new_state_dict[ k[7:] ] = v
+
+                model.load_state_dict(new_state_dict)
+
+            # Collect all output for testing set
+            model.to(self.device)
+            model.eval()
+            batch, batch_labels = self.dm.get_batch('test', size=1, single_file=file)
+            batch.to(self.device)
+
+            output[i] = model(batch).t()
+
+        return self.dm.classes[output.argmax().item()]
+
 
 if __name__ == '__main__':
     # Create argument parser for easier CLI
