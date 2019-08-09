@@ -128,8 +128,8 @@ class UrbanSoundDataManager:
                 iterator = self.i_train[train_class]
 
                 # Increment iterator
-                self.i_train[train_class] += size
-                if self.i_train[train_class] + size >= len(self.train_files_by_class[train_class]):
+                self.i_train[train_class] += self.batch_size
+                if self.i_train[train_class] + self.batch_size >= len(self.train_files_by_class[train_class]):
                     self.i_train[train_class] = 0
             else:
                 raise ValueError('train_class must be in the range [0, 9]')
