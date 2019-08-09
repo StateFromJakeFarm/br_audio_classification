@@ -178,19 +178,19 @@ class UrbanSoundDataManager:
             self.load_training_batches()
 
         if type == 'train':
-            if i_train[train_class] >= len(self.training_batches):
-                i_train[train_class] = 0
+            if self.i_train[train_class] >= len(self.training_batches):
+                self.i_train[train_class] = 0
 
-            i_train[train_class] += 1
+            self.i_train[train_class] += 1
 
-            return self.training_batches[ i_train[train_class]-1 ]
+            return self.training_batches[ self.i_train[train_class]-1 ]
         else:
-            if i_test >= len(self.testing_batches):
-                i_test = 0
+            if self.i_test >= len(self.testing_batches):
+                self.i_test = 0
 
-            i_test += 1
+            self.i_test += 1
 
-            return self.testing_batches[i_test-1]
+            return self.testing_batches[self.i_test-1]
 
     def get_label(self, file):
         '''
