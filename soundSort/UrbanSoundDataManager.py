@@ -172,12 +172,12 @@ class UrbanSoundDataManager:
         Get next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
         '''
-        if self.current_training_class != train_class:
-            # Need to load training set for next classifier into memory
-            self.current_training_class = train_class
-            self.load_training_batches()
-
         if type == 'train':
+            if self.current_training_class != train_class:
+                # Need to load training set for next classifier into memory
+                self.current_training_class = train_class
+                self.load_training_batches()
+
             if self.i_train[train_class] >= len(self.training_batches):
                 self.i_train[train_class] = 0
 

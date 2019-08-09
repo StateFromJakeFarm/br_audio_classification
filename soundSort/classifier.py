@@ -138,7 +138,7 @@ class Classifier:
         abs_diff, false_pos, false_neg = 0, 0, 0
         for i in range(num_batches):
             # Get testing batch
-            batch, labels = self.dm.get_batch('test', size=self.batch_size)
+            batch, labels = self.dm.get_batch('test')
             batch.to(self.device)
             labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
@@ -290,7 +290,7 @@ class Classifier:
             model.to(self.device)
             model.eval()
             for j in range(num_batches):
-                batch, batch_labels = self.dm.get_batch('test', size=self.batch_size)
+                batch, batch_labels = self.dm.get_batch('test')
                 batch.to(self.device)
 
                 # Wipe state clean for next file (gross way to do it)
