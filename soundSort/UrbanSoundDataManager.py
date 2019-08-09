@@ -10,11 +10,12 @@ class UrbanSoundDataManager:
     '''
     Load files from UrbanSound8K dataset for training and testing
     '''
-    def __init__(self, audio_dir, test_fold=None, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
+    def __init__(self, audio_dir, batch_size=10, test_fold=None, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
         '''
         Constructor
         '''
         self.audio_dir = audio_dir
+        self.batch_size = batch_size
         self.sr = sr
 
         # Dataset classes
@@ -59,7 +60,7 @@ class UrbanSoundDataManager:
                     train_files.append(f_path)
 
         if train_class_pct < 0 or train_class_pct > 1:
-            raise ValueError('train_class_pct must be within the range [0, 1)')
+            raise ValueError('train_class_pct must be within the range [0, 1]')
 
         # (Likely) Overselect the class being trained for on each model because
         # dataset is very unbalanced
@@ -87,7 +88,35 @@ class UrbanSoundDataManager:
         self.i_train = [0 for c in self.classes]
         self.i_test = 0
 
-    def get_batch(self, type, size=10, train_class=None, use_fft=False):
+        # Store training batches for current class being trained only (because
+        # they are trained serially, and so only one class' training set needs
+        # to be in memory at a time)
+        self.current_training_class = ''
+        self.training_batches = []
+
+        # Store testing batches in memory
+        self.testing_batches = []
+        for batch in range(len(self.test_files) % self.batch_size):
+            self.testing_batches.append(
+                self.build_batch('test', train_class=self.current_training_class)
+            )
+
+        # Reset iterator for use in self.get_batch()
+        self.i_test = 0
+
+    def load_training_batches(self):
+        '''
+        Load training set for current training class into memory
+        '''
+        for batch in range(len(self.train_files_by_class[self.current_training_class]) % self.batch_size):
+            self.training_batches.append(
+                self.build_batch('train', train_class=self.current_training_class)
+            )
+
+        # Reset iterator for use in self.get_batch()
+        self.i_train[self.current_training_class] = 0
+
+    def build_batch(self, type, train_class=None, use_fft=False):
         '''
         Get next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
@@ -109,14 +138,14 @@ class UrbanSoundDataManager:
             iterator = self.i_test
 
             # Increment iterator
-            self.i_test += size
-            if self.i_test + size >= len(self.test_files):
+            self.i_test += self.batch_size
+            if self.i_test + self.batch_size >= len(self.test_files):
                 self.i_test = 0
 
         # Compile file data for this chunk into tensor
-        batch = np.zeros((size, self.chunks, self.chunk_len), dtype=float)
+        batch = np.zeros((self.batch_size, self.chunks, self.chunk_len), dtype=float)
         labels = []
-        for i, file in enumerate(file_set[iterator:iterator+size]):
+        for i, file in enumerate(file_set[iterator:iterator+self.batch_size]):
             # Extract label
             labels.append(self.get_label(file))
 
@@ -136,6 +165,32 @@ class UrbanSoundDataManager:
                     batch[i][chunk] = fft(batch[i][chunk]).real
 
         return torch.from_numpy(batch.astype(np.float32)), labels
+
+
+    def get_batch(self, type, train_class=None, use_fft=False):
+        '''
+        Get next batch of shape (batch, seq_len, seq), which is representative
+        of (file, chunks, chunk_len)
+        '''
+        if self.current_training_class != train_class:
+            # Need to load training set for next classifier into memory
+            self.current_training_class = train_class
+            self.load_training_batches()
+
+        if type == 'train':
+            if i_train[train_class] >= len(self.training_batches):
+                i_train[train_class] = 0
+
+            i_train[train_class] += 1
+
+            return self.training_batches[ i_train[train_class]-1 ]
+        else:
+            if i_test >= len(self.testing_batches):
+                i_test = 0
+
+            i_test += 1
+
+            return self.testing_batches[i_test-1]
 
     def get_label(self, file):
         '''

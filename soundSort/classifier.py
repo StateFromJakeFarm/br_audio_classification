@@ -85,7 +85,7 @@ class Classifier:
             self.dm = SoundSortDataManager(dataset_path, os.environ['SOUNDSCRAPE_AUTH_JSON'], 'soundscrape-bucket', gathered.split(','), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         else:
             # Use UrbanSound8K dataset
-            self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+            self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), batch_size=self.batch_size, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
 
         # Loss function used during training
         self.loss_function = nn.MSELoss()
@@ -192,7 +192,7 @@ class Classifier:
                     model.zero_grad()
 
                     # Retrieve batch
-                    batch, labels = self.dm.get_batch('train', size=self.batch_size, train_class=i)
+                    batch, labels = self.dm.get_batch('train', train_class=i)
                     batch.to(self.device)
 
                     # Wipe state clean for next file (gross way to do it)
