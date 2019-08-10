@@ -178,6 +178,9 @@ class Classifier:
         false_neg = float(false_neg)/abs_diff
         accuracy = 1 - (abs_diff / (self.batch_size*num_batches))
 
+        # Reset testing iterator
+        self.dm.i_test = 0
+
         return accuracy*100, false_pos*100, false_neg*100
 
     def train(self, epochs):
@@ -222,6 +225,9 @@ class Classifier:
                     loss.backward()
                     optimizer.step()
                     optimizer.zero_grad()
+
+                # Reset training iterator
+                self.dm.i_train = 0
 
                 if (e+1) % (epochs//10) == 0:
                     # Run against test set
