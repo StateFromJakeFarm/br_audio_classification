@@ -187,7 +187,7 @@ class Classifier:
 
         # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
-            logging.info('Training {} model'.format(self.dm.classes[model.label]))
+            logging.info('Training {} model ({}/{})'.format(self.dm.classes[model.label], i, len(self.models)))
 
             # Move model to training device
             model.to(self.device)
@@ -327,24 +327,24 @@ if __name__ == '__main__':
         prog='classifier.py')
     parser.add_argument('-p', '--path', type=str, required=True,
         help='path to UrbanSound[8K] dataset')
-    parser.add_argument('--hidden', type=int, required=True,
-        help='dimension of hidden internal layers of network')
-    parser.add_argument('-b', '--batch', type=int, required=True,
-        help='batch size for training and testing')
+    parser.add_argument('--hidden', type=int, default=128,
+        help='dimension of hidden internal layers of network (default is 128)')
+    parser.add_argument('-b', '--batch', type=int, default=100,
+        help='batch size for training and testing (default is 100)')
     parser.add_argument('--lr', type=float, default=0.005,
-        help='learning rate')
-    parser.add_argument('-e', '--epochs', type=int, required=True,
-        help='number of training epochs')
+        help='learning rate (default is 0.005)')
+    parser.add_argument('-e', '--epochs', type=int, default=100,
+        help='number of training epochs (default is 100)')
     parser.add_argument('-t', '--target', type=float, default=0.5,
-        help='fraction of training set to be of target class (accomplished by resampling target class to correct imbalance)')
+        help='fraction of training set to be of target class; accomplished by resampling target class to correct imbalance (default is 0.5)')
     parser.add_argument('-d', '--duration', type=float, default=2,
-        help='number of seconds used from each file in dataset (those shorter are zero-padded)')
+        help='number of seconds used from each file in dataset; those shorter are zero-padded (default is 2)')
     parser.add_argument('-r', '--recurrent', type=int, default=3,
-        help='number of recurrent layers in each model')
+        help='number of recurrent layers in each model (default is 3)')
     parser.add_argument('--sr', type=int, default=16000,
-        help='sample rate at which files are loaded')
+        help='sample rate at which files are loaded (default is 16000)')
     parser.add_argument('-a', '--accuracy', type=float, default=0.9,
-        help='stop training a model as soon as it reaches this accuracy score')
+        help='stop training a model as soon as it reaches this accuracy score (default is 0.9)')
     parser.add_argument('-s', '--save', type=str, default=None,
         help='name of save directory (cannot already exist in "saved_models/")')
     parser.add_argument('-c', '--card', type=int, default=None,
@@ -352,7 +352,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gathered', type=str, default=None,
         help='comma-separated classes to identify within dataset gathered by soundScrape')
     parser.add_argument('-l', '--load', type=str, default=None,
-        help='load and test entire classifier against test set')
+        help='path to classifier save directory to be loaded and tested')
     args = parser.parse_args()
 
     # Set log level to info
