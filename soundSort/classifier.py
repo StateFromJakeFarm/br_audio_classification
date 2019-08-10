@@ -2,13 +2,14 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import pickle
 import logging
 import argparse
 
 from UrbanSoundDataManager import UrbanSoundDataManager
 from SoundSortDataManager import SoundSortDataManager
 from sys import argv, stderr
-from os.path import join
+from os.path import join, isfile
 from collections import OrderedDict
 
 class Classifier:
@@ -62,11 +63,8 @@ class Classifier:
         self.min_accuracy = min_accuracy
 
         # Whether or not we'll be saving snapshots of models during training
-        self.save = save
-        if save:
-            # Create directory for saving output
-            self.save_dir = '{}h_{}r_{}sr_{}'.format(hidden_size, num_recurrent, sr, 'soundScrape' if gathered is not None else 'UrbanSound8K')
-
+        self.save_dir = save
+        if self.save_dir is not None:
             # Log script output to file
             full_save_path = join('saved_models', self.save_dir)
             os.makedirs(full_save_path)
@@ -75,6 +73,17 @@ class Classifier:
             formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
             handler.setFormatter(formatter)
             logging.getLogger().addHandler(handler)
+
+            # Save model parameters so they can be loaded during testing
+            model_params = {
+                'hidden_size': hidden_size,
+                'batch_size': batch_size,
+                'num_recurrent': num_recurrent,
+                'sr': sr,
+                'file_duration': file_duration,
+                'gathered': gathered,
+            }
+            pickle.dump(model_params, open(join(full_save_path, 'model_params.p'), 'wb'))
 
         # Init data manager
         logging.info('Initializing data manager')
@@ -123,7 +132,7 @@ class Classifier:
             # Optimizers specific to each model
             self.optimizers.append(optim.Adam(model.parameters(), lr=lr))
 
-            if self.save:
+            if self.save_dir is not None:
                 # Create model's save directory
                 os.makedirs(join('saved_models', self.save_dir, str(label)))
 
@@ -150,9 +159,6 @@ class Classifier:
 
             # Run model
             output = model(batch)
-
-            # Free up memory
-            del batch
 
             # Calculate accuracy
             output_rounded = torch.round(output.t())
@@ -181,6 +187,8 @@ class Classifier:
 
         # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
+            logging.info('Training {} model'.format(self.dm.classes[model.label]))
+
             # Move model to training device
             model.to(self.device)
 
@@ -204,9 +212,6 @@ class Classifier:
                     # Run network
                     output = model(batch)
 
-                    # Free up memory
-                    del batch
-
                     # Determine correct output for this batch
                     correct_output = torch.reshape(torch.Tensor([float(label == model.label) for label in labels]), (self.batch_size, 1)).to(self.device)
 
@@ -220,21 +225,19 @@ class Classifier:
 
                 if (e+1) % (epochs//10) == 0:
                     # Run against test set
-                    if self.save:
+                    if self.save_dir is not None:
                         # Save a snapshot
                         save_path = join('saved_models', self.save_dir, str(model.label), '{}_epochs.pth'.format(e+1))
                     else:
                         save_path = None
 
                     accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
-                    logging.info('({}/{}) model {}: accuracy = {:.2f}% ({:.2f}% false positive, {:.2f}% false negative)'.format(e+1, epochs, model.label, accuracy, false_pos, false_neg))
+                    logging.info('  ({}/{}) accuracy = {:.2f}% (error breakdown: {:.2f}% false positive, {:.2f}% false negative)'.format(
+                        e+1, epochs, accuracy, false_pos, false_neg))
 
                     if accuracy >= self.min_accuracy*100:
                         # Model has met minimum criteria, exit now
                         break
-
-            # Free up memory
-            del model
 
         logging.info('Finish training')
 
@@ -266,7 +269,7 @@ class Classifier:
 
         # Load and test each model
         for i, c in enumerate(self.dm.classes):
-            logging.info('Running model {} ({})'.format(i, c))
+            logging.info('Running {} model'.format(c))
 
             model = self.models[i]
             if saved_classifiers_path is not None:
@@ -279,7 +282,8 @@ class Classifier:
                 try:
                     model.load_state_dict(state_dict)
                 except RuntimeError:
-                    # Model (probably) trained with GPU and we're now trying to load it with a CPU
+                    # Model (probably) trained with GPU and we're now trying to load it with a CPU,
+                    # which requires restructuring state dictionary
                     new_state_dict = OrderedDict()
                     for k, v in state_dict.items():
                         new_state_dict[ k[7:] ] = v
@@ -289,6 +293,7 @@ class Classifier:
             # Collect all output for testing set
             model.to(self.device)
             model.eval()
+            self.dm.i_test = 0
             for j in range(num_batches):
                 batch, batch_labels = self.dm.get_batch('test')
                 batch.to(self.device)
@@ -304,9 +309,6 @@ class Classifier:
                 if i == 0:
                     # No need to overwrite labels with the same data on every pass
                     labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
-
-                # Free up memory
-                del batch
 
         # Calculate accuracy
         output = output.t()
@@ -343,8 +345,8 @@ if __name__ == '__main__':
         help='sample rate at which files are loaded')
     parser.add_argument('-a', '--accuracy', type=float, default=0.9,
         help='stop training a model as soon as it reaches this accuracy score')
-    parser.add_argument('-s', '--save', action='store_true', default=False,
-        help='flag to save network and log output')
+    parser.add_argument('-s', '--save', type=str, default=None,
+        help='name of save directory (cannot already exist in "saved_models/")')
     parser.add_argument('-c', '--card', type=int, default=None,
         help='index of CUDA-capable GPU to be used for training and testing')
     parser.add_argument('-g', '--gathered', type=str, default=None,
@@ -356,14 +358,28 @@ if __name__ == '__main__':
     # Set log level to info
     logging.getLogger().setLevel(logging.INFO)
 
-    # Create and train classifier
-    classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,args.lr, args.sr, args.duration, args.card, args.target,
-        args.accuracy, args.save, args.gathered)
-
     if args.load is not None:
-        # Test entire system by running test set through every classifier
-        classifier.full_test(saved_classifiers_path=args.load)
+        logging.info('Loading model from save directory')
+
+        model_params = {}
+        model_params_path = join(args.load, 'model_params.p')
+        if isfile(model_params_path):
+            model_params = pickle.load(open(model_params_path, 'rb'))
+
+            classifier = Classifier(args.path, model_params['hidden_size'], model_params['batch_size'],
+                model_params['num_recurrent'], args.lr, model_params['sr'],
+                model_params['file_duration'], args.card, args.target, args.accuracy, args.save,
+                model_params['gathered'])
+
+            # Test entire system by running test set through every classifier
+            classifier.full_test(saved_classifiers_path=args.load)
+        else:
+            logging.error('Could not find "model_params.p" in save directory')
     else:
+        classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,
+            args.lr, args.sr, args.duration, args.card, args.target,
+            args.accuracy, args.save, args.gathered)
+
         # Train all classifiers to identify their respective sounds
         classifier.train(args.epochs)
         classifier.full_test()

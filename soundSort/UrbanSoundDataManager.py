@@ -2,6 +2,7 @@ import os
 import torch
 import random
 import librosa
+import logging
 import numpy as np
 
 from numpy.fft import fft
@@ -85,7 +86,7 @@ class UrbanSoundDataManager:
         self.samples_per_file = self.sr*file_duration
 
         # Iterators to keep track of where we are in the training and testing sets
-        self.i_train = [0 for c in self.classes]
+        self.i_train = 0
         self.i_test = 0
 
         # Store training batches for current class being trained only (because
@@ -95,11 +96,11 @@ class UrbanSoundDataManager:
         self.training_batches = []
 
         # Store testing batches in memory
+        logging.info('Loading testing batches into memory')
         self.testing_batches = []
         for batch in range(len(self.test_files) % self.batch_size):
             self.testing_batches.append(
-                self.build_batch('test', train_class=self.current_training_class)
-            )
+                self.build_batch('test', train_class=self.current_training_class))
 
         # Reset iterator for use in self.get_batch()
         self.i_test = 0
@@ -108,13 +109,14 @@ class UrbanSoundDataManager:
         '''
         Load training set for current training class into memory
         '''
+        logging.info('Loading training batches into memory')
+        self.training_batches = []
         for batch in range(len(self.train_files_by_class[self.current_training_class]) % self.batch_size):
             self.training_batches.append(
-                self.build_batch('train', train_class=self.current_training_class)
-            )
+                self.build_batch('train', train_class=self.current_training_class))
 
         # Reset iterator for use in self.get_batch()
-        self.i_train[self.current_training_class] = 0
+        self.i_train = 0
 
     def build_batch(self, type, train_class=None, use_fft=False):
         '''
@@ -125,12 +127,12 @@ class UrbanSoundDataManager:
         if type == 'train':
             if train_class is not None and train_class in [c for c in range(len(self.classes))]:
                 file_set = self.train_files_by_class[train_class]
-                iterator = self.i_train[train_class]
+                iterator = self.i_train
 
                 # Increment iterator
-                self.i_train[train_class] += self.batch_size
-                if self.i_train[train_class] + self.batch_size >= len(self.train_files_by_class[train_class]):
-                    self.i_train[train_class] = 0
+                self.i_train += self.batch_size
+                if self.i_train + self.batch_size >= len(self.train_files_by_class[train_class]):
+                    self.i_train = 0
             else:
                 raise ValueError('train_class must be in the range [0, 9]')
         else:
@@ -178,12 +180,12 @@ class UrbanSoundDataManager:
                 self.current_training_class = train_class
                 self.load_training_batches()
 
-            if self.i_train[train_class] >= len(self.training_batches):
-                self.i_train[train_class] = 0
+            if self.i_train >= len(self.training_batches):
+                self.i_train = 0
 
-            self.i_train[train_class] += 1
+            self.i_train += 1
 
-            return self.training_batches[ self.i_train[train_class]-1 ]
+            return self.training_batches[ self.i_train-1 ]
         else:
             if self.i_test >= len(self.testing_batches):
                 self.i_test = 0
