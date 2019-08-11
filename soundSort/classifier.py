@@ -245,6 +245,7 @@ class Classifier:
                         # Model has met minimum criteria, exit now
                         break
 
+        del self.dm.training_batches
         logging.info('Finish training')
 
     def get_latest_save_file(self, saved_classifier_path):
