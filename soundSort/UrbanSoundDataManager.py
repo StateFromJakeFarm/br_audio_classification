@@ -185,7 +185,7 @@ class UrbanSoundDataManager:
 
             self.i_train += 1
 
-            return self.training_batches[ self.i_train-1 ]
+            return self.training_batches[self.i_train-1]
         else:
             if self.i_test >= len(self.testing_batches):
                 self.i_test = 0

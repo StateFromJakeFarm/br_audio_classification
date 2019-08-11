@@ -190,7 +190,7 @@ class Classifier:
 
         # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
-            logging.info('Training {} model ({}/{})'.format(self.dm.classes[model.label], i, len(self.models)))
+            logging.info('Training {} model ({}/{})'.format(self.dm.classes[model.label], i+1, len(self.models)))
 
             # Move model to training device
             model.to(self.device)
@@ -318,18 +318,26 @@ class Classifier:
 
         # Calculate accuracy
         output = output.t()
-        correct = 0
-        total = 0
+        correct = [0 for c in self.dm.classes]
+        total = [0 for c in self.dm.classes]
         for i in range(num_test_files):
-            if labels[i].item() < len(self.dm.classes):
-                total += 1
-                correct += (output[i].argmax().item() == labels[i].item())
+            label = labels[i].item()
+            if label < len(self.dm.classes):
+                total[label] += 1
+                correct[label] += (output[i].argmax().item() == label)
 
-        logging.info('Correct: {}/{} ({}% accuracy)'.format(correct, total, float(correct)/total*100))
+        logging.info('Accuracy by class:')
+        for i, class_name in enumerate(self.dm.classes):
+            logging.info('  {}: {}/{} correctly labeled ({}%)'.format(
+                class_name, correct[i], total[i], float(correct[i])/total[i]*100))
+
+        sum_correct = sum(correct)
+        sum_total = sum(total)
+        logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(sum_correct, sum_total, float(sum_correct)/sum_total*100))
 
 if __name__ == '__main__':
     # Create argument parser for easier CLI
-    parser = argparse.ArgumentParser(description='Binary classifier models for UrbanSound classification',
+    parser = argparse.ArgumentParser(description='Ensemble of binary relevance models for audio classification',
         prog='classifier.py')
     parser.add_argument('-p', '--path', type=str, required=True,
         help='path to UrbanSound[8K] dataset')
