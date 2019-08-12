@@ -97,7 +97,7 @@ class UrbanSoundDataManager:
         # Store testing batches in memory
         logging.info('Loading testing batches into memory')
         self.testing_batches = []
-        for batch in range(len(self.test_files) % self.batch_size):
+        for batch in range(len(self.test_files) // self.batch_size):
             self.testing_batches.append(
                 self.build_batch('test'))
 
