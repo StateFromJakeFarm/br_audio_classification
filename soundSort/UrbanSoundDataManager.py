@@ -92,7 +92,6 @@ class UrbanSoundDataManager:
         # Store training batches for current class being trained only (because
         # they are trained serially, and so only one class' training set needs
         # to be in memory at a time)
-        self.current_training_class = ''
         self.training_batches = []
 
         # Store testing batches in memory
@@ -100,20 +99,20 @@ class UrbanSoundDataManager:
         self.testing_batches = []
         for batch in range(len(self.test_files) % self.batch_size):
             self.testing_batches.append(
-                self.build_batch('test', train_class=self.current_training_class))
+                self.build_batch('test'))
 
         # Reset iterator for use in self.get_batch()
         self.i_test = 0
 
-    def load_training_batches(self):
+    def load_training_batches(self, current_training_class):
         '''
         Load training set for current training class into memory
         '''
         logging.info('Loading training batches into memory')
         self.training_batches = []
-        for batch in range(len(self.train_files_by_class[self.current_training_class]) % self.batch_size):
+        for batch in range(len(self.train_files_by_class[current_training_class]) // self.batch_size):
             self.training_batches.append(
-                self.build_batch('train', train_class=self.current_training_class))
+                self.build_batch('train', train_class=current_training_class))
 
         # Reset iterator for use in self.get_batch()
         self.i_train = 0
@@ -175,11 +174,6 @@ class UrbanSoundDataManager:
         of (file, chunks, chunk_len)
         '''
         if type == 'train':
-            if self.current_training_class != train_class:
-                # Need to load training set for next classifier into memory
-                self.current_training_class = train_class
-                self.load_training_batches()
-
             if self.i_train >= len(self.training_batches):
                 self.i_train = 0
 

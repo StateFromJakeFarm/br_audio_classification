@@ -186,8 +186,6 @@ class Classifier:
     def train(self, epochs):
         logging.info('Begin training ({} epochs)'.format(epochs))
 
-        batches_per_epoch = self.dm.num_train_files // self.batch_size
-
         # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
             logging.info('Training {} model ({}/{})'.format(self.dm.classes[model.label], i+1, len(self.models)))
@@ -198,8 +196,11 @@ class Classifier:
             # Retrieve optimizer
             optimizer = self.optimizers[i]
 
+            # Load training set for this class into memory
+            self.dm.load_training_batches(i)
+
             for e in range(epochs):
-                for _ in range(batches_per_epoch):
+                for _ in self.dm.training_batches:
                     model.zero_grad()
 
                     # Retrieve batch
@@ -245,7 +246,6 @@ class Classifier:
                         # Model has met minimum criteria, exit now
                         break
 
-        del self.dm.training_batches
         logging.info('Finish training')
 
     def get_latest_save_file(self, saved_classifier_path):
