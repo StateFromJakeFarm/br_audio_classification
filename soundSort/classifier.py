@@ -143,11 +143,9 @@ class Classifier:
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
 
-        num_batches = num_test_files // self.batch_size
         abs_diff, false_pos, false_neg = 0, 0, 0
-        for i in range(num_batches):
+        for batch, labels in self.dm.testing_batches:
             # Get testing batch
-            batch, labels = self.dm.get_batch('test')
             batch.to(self.device)
             labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
@@ -176,10 +174,7 @@ class Classifier:
 
         false_pos = float(false_pos)/abs_diff
         false_neg = float(false_neg)/abs_diff
-        accuracy = 1 - (abs_diff / (self.batch_size*num_batches))
-
-        # Reset testing iterator
-        self.dm.i_test = 0
+        accuracy = 1 - (abs_diff / (self.batch_size*len(self.dm.testing_batches)))
 
         return accuracy*100, false_pos*100, false_neg*100
 
@@ -200,11 +195,8 @@ class Classifier:
             self.dm.load_training_batches(i)
 
             for e in range(epochs):
-                for _ in self.dm.training_batches:
-                    model.zero_grad()
-
+                for batch, labels in self.dm.training_batches:
                     # Retrieve batch
-                    batch, labels = self.dm.get_batch('train', train_class=i)
                     batch.to(self.device)
 
                     # Wipe state clean for next file (gross way to do it)
@@ -226,9 +218,7 @@ class Classifier:
                     loss.backward()
                     optimizer.step()
                     optimizer.zero_grad()
-
-                # Reset training iterator
-                self.dm.i_train = 0
+                    model.zero_grad()
 
                 if (e+1) % (epochs//10) == 0:
                     # Run against test set
@@ -268,8 +258,6 @@ class Classifier:
         # Determine number of test files and batches to be used
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
-        num_batches = num_test_files // self.batch_size
-
         # Record all output
         output = torch.zeros([len(self.dm.classes), num_test_files], dtype=torch.float32)
         labels = torch.zeros([num_test_files], dtype=torch.int16)
@@ -300,9 +288,7 @@ class Classifier:
             # Collect all output for testing set
             model.to(self.device)
             model.eval()
-            self.dm.i_test = 0
-            for j in range(num_batches):
-                batch, batch_labels = self.dm.get_batch('test')
+            for batch, batch_labels in self.dm.testing_batches:
                 batch.to(self.device)
 
                 # Wipe state clean for next file (gross way to do it)

@@ -101,9 +101,6 @@ class UrbanSoundDataManager:
             self.testing_batches.append(
                 self.build_batch('test'))
 
-        # Reset iterator for use in self.get_batch()
-        self.i_test = 0
-
     def load_training_batches(self, current_training_class):
         '''
         Load training set for current training class into memory
@@ -113,9 +110,6 @@ class UrbanSoundDataManager:
         for batch in range(len(self.train_files_by_class[current_training_class]) // self.batch_size):
             self.training_batches.append(
                 self.build_batch('train', train_class=current_training_class))
-
-        # Reset iterator for use in self.get_batch()
-        self.i_train = 0
 
     def build_batch(self, type, train_class=None, use_fft=False):
         '''
@@ -166,27 +160,6 @@ class UrbanSoundDataManager:
                     batch[i][chunk] = fft(batch[i][chunk]).real
 
         return torch.from_numpy(batch.astype(np.float32)), labels
-
-
-    def get_batch(self, type, train_class=None, use_fft=False):
-        '''
-        Get next batch of shape (batch, seq_len, seq), which is representative
-        of (file, chunks, chunk_len)
-        '''
-        if type == 'train':
-            if self.i_train >= len(self.training_batches):
-                self.i_train = 0
-
-            self.i_train += 1
-
-            return self.training_batches[self.i_train-1]
-        else:
-            if self.i_test >= len(self.testing_batches):
-                self.i_test = 0
-
-            self.i_test += 1
-
-            return self.testing_batches[self.i_test-1]
 
     def get_label(self, file):
         '''
