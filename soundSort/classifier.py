@@ -22,9 +22,11 @@ class Classifier:
         Model used to identify each class
         '''
         def init_state_tensors(self):
-            self.h = torch.zeros(self.num_recurrent, self.batch_size, self.hidden_size).to(self.device)
+            self.h = torch.zeros(self.num_recurrent, self.batch_size,
+                self.hidden_size).to(self.device)
 
-        def __init__(self, input_size, hidden_size, batch_size, num_recurrent, chunks, chunk_len, label, device):
+        def __init__(self, input_size, hidden_size, batch_size, num_recurrent,
+            dropout, chunks, chunk_len, label, device):
             super(Classifier.Model, self).__init__()
 
             self.hidden_size = hidden_size
@@ -38,14 +40,22 @@ class Classifier:
             # Define model
             self.preprocessor = nn.Sequential(
                 nn.Linear(input_size, hidden_size),
-                nn.Tanh(),
+                nn.ReLU(True),
                 nn.Linear(hidden_size, hidden_size),
-                nn.Tanh(),
+                nn.ReLU(True),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(True),
+                nn.Linear(hidden_size, hidden_size),
+                nn.ReLU(True),
             )
-            self.gru = nn.GRU(hidden_size, hidden_size, num_layers=num_recurrent, batch_first=True)
+            self.gru = nn.GRU(hidden_size, hidden_size, num_layers=num_recurrent, batch_first=True, dropout=dropout)
             self.postprocessor = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size),
+                nn.Sigmoid(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.Sigmoid(),
                 nn.Linear(hidden_size, 1),
-                nn.Sigmoid()
+                nn.Sigmoid(),
             )
 
             # Init hidden and cell states
@@ -57,7 +67,9 @@ class Classifier:
             x, self.h = self.gru(x, self.h)
             return self.postprocessor(self.h)[0]
 
-    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent, lr, sr, file_duration, device_id, train_class_pct, min_accuracy, save, gathered):
+    def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent,
+        lr, dropout, sr, file_duration, device_id, train_class_pct,
+        min_accuracy, save, gathered):
         logging.info('Initializing classifier')
         self.batch_size = batch_size
         self.min_accuracy = min_accuracy
@@ -82,6 +94,7 @@ class Classifier:
                 'sr': sr,
                 'file_duration': file_duration,
                 'gathered': gathered,
+                'dropout': dropout,
             }
             pickle.dump(model_params, open(join(full_save_path, 'model_params.p'), 'wb'))
 
@@ -116,7 +129,9 @@ class Classifier:
         self.models = []
         self.optimizers = []
         for label in range(len(self.dm.classes)):
-            model = self.Model(self.dm.chunk_len, hidden_size, batch_size, num_recurrent, self.dm.chunks, self.dm.chunk_len, label, self.device)
+            model = self.Model(self.dm.chunk_len, hidden_size, batch_size, num_recurrent, dropout,
+            self.dm.chunks, self.dm.chunk_len, label, self.device)
+
             model.float()
 
             if self.use_cuda:
@@ -183,7 +198,7 @@ class Classifier:
 
         # Train each model serially to minimize memory footprint
         for i, model in enumerate(self.models):
-            logging.info('Training {} model ({}/{})'.format(self.dm.classes[model.label], i+1, len(self.models)))
+            logging.info('Training "{}" model ({}/{})'.format(self.dm.classes[model.label], i+1, len(self.models)))
 
             # Move model to training device
             model.to(self.device)
@@ -264,7 +279,7 @@ class Classifier:
 
         # Load and test each model
         for i, c in enumerate(self.dm.classes):
-            logging.info('Running {} model'.format(c))
+            logging.info('Running "{}" model'.format(c))
 
             model = self.models[i]
             if saved_classifiers_path is not None:
@@ -344,6 +359,8 @@ if __name__ == '__main__':
         help='number of recurrent layers in each model (default is 3)')
     parser.add_argument('--sr', type=int, default=16000,
         help='sample rate at which files are loaded (default is 16000)')
+    parser.add_argument('--dropout', type=float, default=0.0,
+        help='drouput rate for recurrent part of network during training (default is 0)')
     parser.add_argument('-a', '--accuracy', type=float, default=0.9,
         help='stop training a model as soon as it reaches this accuracy score (default is 0.9)')
     parser.add_argument('-s', '--save', type=str, default=None,
@@ -368,7 +385,7 @@ if __name__ == '__main__':
             model_params = pickle.load(open(model_params_path, 'rb'))
 
             classifier = Classifier(args.path, model_params['hidden_size'], model_params['batch_size'],
-                model_params['num_recurrent'], args.lr, model_params['sr'],
+                model_params['num_recurrent'], args.lr, model_params['dropout'], model_params['sr'],
                 model_params['file_duration'], args.card, args.target, args.accuracy, args.save,
                 model_params['gathered'])
 
@@ -378,7 +395,7 @@ if __name__ == '__main__':
             logging.error('Could not find "model_params.p" in save directory')
     else:
         classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,
-            args.lr, args.sr, args.duration, args.card, args.target,
+            args.lr, args.dropout, args.sr, args.duration, args.card, args.target,
             args.accuracy, args.save, args.gathered)
 
         # Train all classifiers to identify their respective sounds

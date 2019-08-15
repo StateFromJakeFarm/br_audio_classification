@@ -41,6 +41,7 @@ class UrbanSoundDataManager:
             self.test_fold = test_fold
         else:
             raise ValueError('test_fold must be in range [1, {}]'.format(folds))
+        logging.info('test fold: {}'.format(self.test_fold))
 
         # Compile lists of all training and testing file paths
         train_set_class_counts = [0 for c in self.classes]
