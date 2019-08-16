@@ -69,10 +69,9 @@ class Classifier:
 
     def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent,
         lr, dropout, sr, file_duration, device_id, train_class_pct,
-        min_accuracy, save, gathered):
+        save, gathered):
         logging.info('Initializing classifier')
         self.batch_size = batch_size
-        self.min_accuracy = min_accuracy
 
         # Whether or not we'll be saving snapshots of models during training
         self.save_dir = save
@@ -156,10 +155,7 @@ class Classifier:
         '''
         Determine a model's accuracy against testing set
         '''
-        total_test_files = len(self.dm.test_files)
-        num_test_files = total_test_files - (total_test_files % self.batch_size)
-
-        abs_diff, false_pos, false_neg = 0, 0, 0
+        missed_this_class, missed_other_classes, total_this_class = 0, 0, 0
         for batch, labels in self.dm.testing_batches:
             # Get testing batch
             batch.to(self.device)
@@ -178,21 +174,21 @@ class Classifier:
             output_rounded = torch.round(output.t())
             diff = (labels_tensor - output_rounded)
 
-            for v in diff[0]:
+            for i, v in enumerate(diff[0]):
                 v = v.item()
-                abs_diff += abs(v)
-                false_pos += -1 * min(0, v)
-                false_neg += max(0, v)
+                total_this_class += int(labels_tensor[i])
+                if abs(v):
+                    # Missed this one
+                    if labels_tensor[i]:
+                        missed_this_class += 1
+                    else:
+                        missed_other_classes += 1
 
         if save_path is not None:
             # Save model
             torch.save(model.state_dict(), save_path)
 
-        false_pos = float(false_pos)/abs_diff
-        false_neg = float(false_neg)/abs_diff
-        accuracy = 1 - (abs_diff / (self.batch_size*len(self.dm.testing_batches)))
-
-        return accuracy*100, false_pos*100, false_neg*100
+        return total_this_class - missed_this_class, total_this_class, missed_other_classes, len(self.dm.testing_batches)*self.batch_size - total_this_class
 
     def train(self, epochs):
         logging.info('Begin training ({} epochs)'.format(epochs))
@@ -244,13 +240,9 @@ class Classifier:
                     else:
                         save_path = None
 
-                    accuracy, false_pos, false_neg = self.test(model, save_path=save_path)
-                    logging.info('  ({}/{}) accuracy = {:.2f}% (error breakdown: {:.2f}% false positive, {:.2f}% false negative)'.format(
-                        e+1, epochs, accuracy, false_pos, false_neg))
-
-                    if accuracy >= self.min_accuracy*100:
-                        # Model has met minimum criteria, exit now
-                        break
+                    pos_this_class, total_this_class, pos_other_classes, total_other_classes = self.test(model, save_path=save_path)
+                    logging.info('  ({}/{}) correctly identified for this class: {}/{}  false positives: {}/{}'.format(
+                        e+1, epochs, pos_this_class, total_this_class, pos_other_classes, total_other_classes))
 
         logging.info('Finish training')
 
@@ -363,8 +355,6 @@ if __name__ == '__main__':
         help='sample rate at which files are loaded (default is 16000)')
     parser.add_argument('--dropout', type=float, default=0.0,
         help='drouput rate for recurrent part of network during training (default is 0)')
-    parser.add_argument('-a', '--accuracy', type=float, default=0.9,
-        help='stop training a model as soon as it reaches this accuracy score (default is 0.9)')
     parser.add_argument('-s', '--save', type=str, default=None,
         help='name of save directory (cannot already exist in "saved_models/")')
     parser.add_argument('-c', '--card', type=int, default=None,
@@ -388,8 +378,7 @@ if __name__ == '__main__':
 
             classifier = Classifier(args.path, model_params['hidden_size'], model_params['batch_size'],
                 model_params['num_recurrent'], args.lr, model_params['dropout'], model_params['sr'],
-                model_params['file_duration'], args.card, args.target, args.accuracy, args.save,
-                model_params['gathered'])
+                model_params['file_duration'], args.card, args.target, args.save, model_params['gathered'])
 
             # Test entire system by running test set through every classifier
             classifier.full_test(saved_classifiers_path=args.load)
@@ -398,7 +387,7 @@ if __name__ == '__main__':
     else:
         classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,
             args.lr, args.dropout, args.sr, args.duration, args.card, args.target,
-            args.accuracy, args.save, args.gathered)
+            args.save, args.gathered)
 
         # Train all classifiers to identify their respective sounds
         classifier.train(args.epochs)
