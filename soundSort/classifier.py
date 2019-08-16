@@ -113,7 +113,7 @@ class Classifier:
         self.loss_function = nn.MSELoss()
 
         # Determine device for training
-        self.use_cuda = (torch.cuda.device_count() > 1)
+        self.use_cuda = (torch.cuda.device_count() >= 1)
         if self.use_cuda and device_id is not None:
             # Use GPU if available
             logging.info('Using CUDA GPU')
