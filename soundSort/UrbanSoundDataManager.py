@@ -114,7 +114,7 @@ class UrbanSoundDataManager:
 
     def build_batch(self, type, train_class=None, use_fft=False):
         '''
-        Get next batch of shape (batch, seq_len, seq), which is representative
+        Build next batch of shape (batch, seq_len, seq), which is representative
         of (file, chunks, chunk_len)
         '''
         # Gross hack to actually increment the iterator for the set being used

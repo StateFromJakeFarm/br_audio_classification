@@ -104,7 +104,8 @@ class Classifier:
             # Use dataset gathered by scraper
             if os.environ.get('SOUNDSCRAPE_AUTH_JSON') is None:
                 raise EnvironmentError('SOUNDSCRAPE_AUTH_JSON must be an environment variable containing path to service account JSON credentials file')
-            self.dm = SoundSortDataManager(dataset_path, os.environ['SOUNDSCRAPE_AUTH_JSON'], 'soundscrape-bucket', gathered.split(','), train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+            self.dm = SoundSortDataManager(dataset_path, os.environ['SOUNDSCRAPE_AUTH_JSON'], 'soundscrape-bucket', gathered.split(','), batch_size=self.batch_size,
+                train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
         else:
             # Use UrbanSound8K dataset
             self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), batch_size=self.batch_size, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
@@ -303,7 +304,8 @@ class Classifier:
             # Collect all output for testing set
             model.to(self.device)
             model.eval()
-            for batch, batch_labels in self.dm.testing_batches:
+            for j, batch_and_labels_tuple in enumerate(self.dm.testing_batches):
+                batch, batch_labels = batch_and_labels_tuple
                 batch.to(self.device)
 
                 # Wipe state clean for next file (gross way to do it)
@@ -342,7 +344,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Ensemble of binary relevance models for audio classification',
         prog='classifier.py')
     parser.add_argument('-p', '--path', type=str, required=True,
-        help='path to UrbanSound[8K] dataset')
+        help='path to UrbanSound[8K] dataset OR soundScrape download cache')
     parser.add_argument('--hidden', type=int, default=128,
         help='dimension of hidden internal layers of network (default is 128)')
     parser.add_argument('-b', '--batch', type=int, default=100,
