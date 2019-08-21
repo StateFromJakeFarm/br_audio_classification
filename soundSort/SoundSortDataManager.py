@@ -14,7 +14,9 @@ class SoundSortDataManager:
     Download and prepare files from Google Cloud Storage bucket given a
     service account's JSON credentials file.
     '''
-    def __init__(self, data_dir_path, auth_json_path, bucket_name, classes, batch_size=10, sr=8000, file_duration=4, chunk_duration=0.1, train_class_pct=0.5):
+    def __init__(self, data_dir_path, auth_json_path, bucket_name, classes,
+        batch_size=10, sr=8000, file_duration=4, chunk_duration=0.1,
+        train_class_pct=0.5, max_files=None):
         # Local directory for all audio files
         self.data_dir_path = data_dir_path
 
@@ -93,9 +95,14 @@ class SoundSortDataManager:
 
             files.append(dest_path)
 
-        # Designate 75% of files for training and the rest for testing
         shuffle(files)
-        self.num_train_files = int(len(files)*0.75)
+
+        if max_files is not None and len(files) > max_files:
+            # Use only so many files (possibly due to system memory constraints)
+            files = files[:max_files]
+
+        # Designate 85% of files for training and the rest for testing
+        self.num_train_files = int(len(files)*0.85)
         train_files = files[:self.num_train_files]
         self.test_files = files[self.num_train_files:]
 

@@ -69,7 +69,7 @@ class Classifier:
 
     def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent,
         lr, dropout, sr, file_duration, device_id, train_class_pct,
-        save, gathered):
+        save, gathered, max_files=None):
         logging.info('Initializing classifier')
         self.batch_size = batch_size
 
@@ -104,7 +104,7 @@ class Classifier:
             if os.environ.get('SOUNDSCRAPE_AUTH_JSON') is None:
                 raise EnvironmentError('SOUNDSCRAPE_AUTH_JSON must be an environment variable containing path to service account JSON credentials file')
             self.dm = SoundSortDataManager(dataset_path, os.environ['SOUNDSCRAPE_AUTH_JSON'], 'soundscrape-bucket', gathered.split(','), batch_size=self.batch_size,
-                train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
+                train_class_pct=train_class_pct, file_duration=file_duration, sr=sr, max_files=max_files)
         else:
             # Use UrbanSound8K dataset
             self.dm = UrbanSoundDataManager(join(dataset_path, 'audio'), batch_size=self.batch_size, train_class_pct=train_class_pct, file_duration=file_duration, sr=sr)
@@ -266,9 +266,12 @@ class Classifier:
         # Determine number of test files and batches to be used
         total_test_files = len(self.dm.test_files)
         num_test_files = total_test_files - (total_test_files % self.batch_size)
+
         # Record all output
         output = torch.zeros([len(self.dm.classes), num_test_files], dtype=torch.float32)
         labels = torch.zeros([num_test_files], dtype=torch.int16)
+
+        total_other_classes = 0
 
         # Load and test each model
         for i, c in enumerate(self.dm.classes):
@@ -312,24 +315,31 @@ class Classifier:
                     # No need to overwrite labels with the same data on every pass
                     labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
 
+        del model
+
         # Calculate accuracy
         output = output.t()
         correct = [0 for c in self.dm.classes]
         total = [0 for c in self.dm.classes]
+        false_positives = 0
         for i in range(num_test_files):
             label = labels[i].item()
+
+            ensemble_label = output[i].argmax().item()
             if label < len(self.dm.classes):
                 total[label] += 1
-                correct[label] += (output[i].argmax().item() == label)
+                correct[label] += (ensemble_label == label)
+            else:
+                total_other_classes += 1
+                false_positives += (ensemble_label >= 0.5)
 
         logging.info('Accuracy by class:')
         for i, class_name in enumerate(self.dm.classes):
-            logging.info('  {}: {}/{} correctly labeled ({}%)'.format(
+            logging.info('  {}: {}/{} correctly labeled ({:.2}%)'.format(
                 class_name, correct[i], total[i], float(correct[i])/total[i]*100))
 
-        sum_correct = sum(correct)
-        sum_total = sum(total)
-        logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(sum_correct, sum_total, float(sum_correct)/sum_total*100))
+        total_correct = sum(correct) + (num_test_files - false_positives)
+        logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(total_correct, num_test_files, float(total_correct)/num_test_files*100))
 
 if __name__ == '__main__':
     # Create argument parser for easier CLI
@@ -361,6 +371,8 @@ if __name__ == '__main__':
         help='index of CUDA-capable GPU to be used for training and testing')
     parser.add_argument('-g', '--gathered', type=str, default=None,
         help='comma-separated classes to identify within dataset gathered by soundScrape')
+    parser.add_argument('-m', '--max', type=int, default=None,
+        help='maximum number of files to use in training and testing sets')
     parser.add_argument('-l', '--load', type=str, default=None,
         help='path to classifier save directory to be loaded and tested')
     args = parser.parse_args()
@@ -378,7 +390,8 @@ if __name__ == '__main__':
 
             classifier = Classifier(args.path, model_params['hidden_size'], model_params['batch_size'],
                 model_params['num_recurrent'], args.lr, model_params['dropout'], model_params['sr'],
-                model_params['file_duration'], args.card, args.target, args.save, model_params['gathered'])
+                model_params['file_duration'], args.card, args.target, args.save, model_params['gathered'],
+                args.max)
 
             # Test entire system by running test set through every classifier
             classifier.full_test(saved_classifiers_path=args.load)
@@ -387,8 +400,13 @@ if __name__ == '__main__':
     else:
         classifier = Classifier(args.path, args.hidden, args.batch, args.recurrent,
             args.lr, args.dropout, args.sr, args.duration, args.card, args.target,
-            args.save, args.gathered)
+            args.save, args.gathered, args.max)
 
         # Train all classifiers to identify their respective sounds
         classifier.train(args.epochs)
+
+        # Free up memory
+        del classifier.dm.training_batches
+
+        # Test entire ensemble
         classifier.full_test()
