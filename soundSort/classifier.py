@@ -315,7 +315,7 @@ class Classifier:
                     # No need to overwrite labels with the same data on every pass
                     labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
 
-        del model
+            del model
 
         # Calculate accuracy
         output = output.t()
