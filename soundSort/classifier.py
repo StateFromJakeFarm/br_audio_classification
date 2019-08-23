@@ -299,23 +299,22 @@ class Classifier:
             # Collect all output for testing set
             model.to(self.device)
             model.eval()
-            for j, batch_and_labels_tuple in enumerate(self.dm.testing_batches):
-                batch, batch_labels = batch_and_labels_tuple
-                batch.to(self.device)
+            with torch.no_grad():
+                for j, batch_and_labels_tuple in enumerate(self.dm.testing_batches):
+                    batch, batch_labels = batch_and_labels_tuple
+                    batch.to(self.device)
 
-                # Wipe state clean for next file (gross way to do it)
-                try:
-                    model.module.init_state_tensors()
-                except AttributeError:
-                    model.init_state_tensors()
+                    # Wipe state clean for next file (gross way to do it)
+                    try:
+                        model.module.init_state_tensors()
+                    except AttributeError:
+                        model.init_state_tensors()
 
-                # Record output and labels for this batch
-                output[i][j*self.batch_size:j*self.batch_size+self.batch_size] = model(batch).t()
-                if i == 0:
-                    # No need to overwrite labels with the same data on every pass
-                    labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
-
-            del model
+                    # Record output and labels for this batch
+                    output[i][j*self.batch_size:j*self.batch_size+self.batch_size] = model(batch).t()
+                    if i == 0:
+                        # No need to overwrite labels with the same data on every pass
+                        labels[j*self.batch_size:j*self.batch_size+self.batch_size] = torch.Tensor(batch_labels)
 
         # Calculate accuracy
         output = output.t()
@@ -338,7 +337,10 @@ class Classifier:
             logging.info('  {}: {}/{} correctly labeled ({:.2}%)'.format(
                 class_name, correct[i], total[i], float(correct[i])/total[i]*100))
 
-        total_correct = sum(correct) + (num_test_files - false_positives)
+        total_correct = sum(correct)
+        if false_positives > 0:
+            total_correct += (num_test_files - false_positives)
+
         logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(total_correct, num_test_files, float(total_correct)/num_test_files*100))
 
 if __name__ == '__main__':
