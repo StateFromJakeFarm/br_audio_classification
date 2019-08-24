@@ -335,7 +335,7 @@ class Classifier:
 
         total_correct = sum(correct)
         if false_positives > 0:
-            total_correct += (num_test_files - false_positives)
+            total_correct += (total_other_classes - false_positives)
 
         logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(total_correct, num_test_files, float(total_correct)/num_test_files*100))
 
