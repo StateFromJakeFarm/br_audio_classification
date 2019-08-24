@@ -205,7 +205,7 @@ class SoundSortDataManager:
                 self.i_test = 0
 
         # Compile file data for this chunk into tensor
-        batch = np.zeros((self.batch_size, self.chunks, self.chunk_len), dtype=float)
+        batch = np.zeros((self.chunks, self.batch_size, self.chunk_len), dtype=float)
         labels = []
         for i, file in enumerate(file_set[iterator:iterator+self.batch_size]):
             # Extract label
@@ -220,7 +220,7 @@ class SoundSortDataManager:
 
             # Chunk-up data
             for chunk in range(self.chunks):
-                batch[i][chunk] = Y[chunk*self.chunk_len:chunk*self.chunk_len+self.chunk_len]
+                batch[chunk][i] = Y[chunk*self.chunk_len:chunk*self.chunk_len+self.chunk_len]
 
                 if use_fft:
                     # Use FFT of chunk

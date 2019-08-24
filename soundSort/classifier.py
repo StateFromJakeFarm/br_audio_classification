@@ -11,6 +11,7 @@ from SoundSortDataManager import SoundSortDataManager
 from sys import argv, stderr
 from os.path import join, isfile
 from collections import OrderedDict
+from random import shuffle
 
 class Classifier:
     '''
@@ -43,17 +44,9 @@ class Classifier:
                 nn.ReLU(True),
                 nn.Linear(hidden_size, hidden_size),
                 nn.ReLU(True),
-                nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(True),
-                nn.Linear(hidden_size, hidden_size),
-                nn.ReLU(True),
             )
-            self.gru = nn.GRU(hidden_size, hidden_size, num_layers=num_recurrent, batch_first=True, dropout=dropout)
+            self.gru = nn.GRU(hidden_size, hidden_size, num_layers=num_recurrent, dropout=dropout)
             self.postprocessor = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size),
-                nn.Sigmoid(),
-                nn.Linear(hidden_size, hidden_size),
-                nn.Sigmoid(),
                 nn.Linear(hidden_size, 1),
                 nn.Sigmoid(),
             )
@@ -62,10 +55,9 @@ class Classifier:
             self.init_state_tensors()
 
         def forward(self, x):
-            # Run network
             x = self.preprocessor(x)
             x, self.h = self.gru(x, self.h)
-            return self.postprocessor(self.h)[0]
+            return self.postprocessor(x[-1])
 
     def __init__(self, dataset_path, hidden_size, batch_size, num_recurrent,
         lr, dropout, sr, file_duration, device_id, train_class_pct,
@@ -156,33 +148,35 @@ class Classifier:
         Determine a model's accuracy against testing set
         '''
         missed_this_class, missed_other_classes, total_this_class = 0, 0, 0
-        for batch, labels in self.dm.testing_batches:
-            # Get testing batch
-            batch.to(self.device)
-            labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
+        with torch.no_grad():
+            model.eval()
+            for batch, labels in self.dm.testing_batches:
+                # Get testing batch
+                batch.to(self.device)
+                labels_tensor = torch.Tensor([float(label == model.label) for label in labels]).to(self.device)
 
-            # Wipe state clean for next file (gross way to do it)
-            try:
-                model.module.init_state_tensors()
-            except AttributeError:
-                model.init_state_tensors()
+                # Wipe state clean for next file (gross way to do it)
+                try:
+                    model.module.init_state_tensors()
+                except AttributeError:
+                    model.init_state_tensors()
 
-            # Run model
-            output = model(batch)
+                # Run model
+                output = model(batch)
 
-            # Calculate accuracy
-            output_rounded = torch.round(output.t())
-            diff = (labels_tensor - output_rounded)
+                # Calculate accuracy
+                output_rounded = torch.round(output.t())
+                diff = (labels_tensor - output_rounded)
 
-            for i, v in enumerate(diff[0]):
-                v = v.item()
-                total_this_class += int(labels_tensor[i])
-                if abs(v):
-                    # Missed this one
-                    if labels_tensor[i]:
-                        missed_this_class += 1
-                    else:
-                        missed_other_classes += 1
+                for i, v in enumerate(diff[0]):
+                    v = v.item()
+                    total_this_class += int(labels_tensor[i])
+                    if abs(v):
+                        # Missed this one
+                        if labels_tensor[i]:
+                            missed_this_class += 1
+                        else:
+                            missed_other_classes += 1
 
         if save_path is not None:
             # Save model
@@ -207,6 +201,7 @@ class Classifier:
             self.dm.load_training_batches(i)
 
             for e in range(epochs):
+                shuffle(self.dm.training_batches)
                 for batch, labels in self.dm.training_batches:
                     # Retrieve batch
                     batch.to(self.device)
@@ -241,6 +236,7 @@ class Classifier:
                         save_path = None
 
                     pos_this_class, total_this_class, pos_other_classes, total_other_classes = self.test(model, save_path=save_path)
+                    model.train()
                     logging.info('  ({}/{}) correctly identified for this class: {}/{}  false positives: {}/{}'.format(
                         e+1, epochs, pos_this_class, total_this_class, pos_other_classes, total_other_classes))
 
