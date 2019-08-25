@@ -267,8 +267,6 @@ class Classifier:
         output = torch.zeros([len(self.dm.classes), num_test_files], dtype=torch.float32)
         labels = torch.zeros([num_test_files], dtype=torch.int16)
 
-        total_other_classes = 0
-
         # Load and test each model
         for i, c in enumerate(self.dm.classes):
             logging.info('Running "{}" model'.format(c))
@@ -315,8 +313,8 @@ class Classifier:
         # Calculate accuracy
         output = output.t()
         correct = [0 for c in self.dm.classes]
+        correct_negatives = 0
         total = [0 for c in self.dm.classes]
-        false_positives = 0
         for i in range(num_test_files):
             label = labels[i].item()
 
@@ -325,17 +323,14 @@ class Classifier:
                 total[label] += 1
                 correct[label] += (ensemble_label == label)
             else:
-                total_other_classes += 1
-                false_positives += (ensemble_label >= 0.5)
+                correct_negatives += (ensemble_label < 0.5)
 
         logging.info('Accuracy by class:')
         for i, class_name in enumerate(self.dm.classes):
             logging.info('  {}: {}/{} correctly labeled ({:.2}%)'.format(
                 class_name, correct[i], total[i], float(correct[i])/total[i]*100))
 
-        total_correct = sum(correct)
-        if false_positives > 0:
-            total_correct += (total_other_classes - false_positives)
+        total_correct = sum(correct) + correct_negatives
 
         logging.info('Overall performance: {}/{} ({:.2f}% accuracy)'.format(total_correct, num_test_files, float(total_correct)/num_test_files*100))
 
