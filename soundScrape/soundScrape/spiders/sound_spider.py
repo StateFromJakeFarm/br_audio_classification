@@ -81,25 +81,31 @@ class SoundSpider(CrawlSpider):
     max_DOM_depth = 2
 
     def start_requests(self):
-        my_sheet = SheetObj(self.auth_json, self.sheet_name)
+        '''Begin making requests to sites to be scraped'''
+        if len(self.start_urls) and len(self.search_terms):
+            # Spider parameters were set from command line; convert them to
+            # required types
+            self.start_urls = self.start_urls.split(',')
+            self.search_terms = self.search_terms.split(',')
+            self.accept_threshold = int(self.accept_threshold) / 100
+            self.max_page = int(self.max_page)
 
-        # Grab our starting URLs from the Google Sheet
-        self.start_urls = my_sheet.get_start_urls()
-        self.pages_visited = self.start_urls
+            if len(self.avoid_terms):
+                self.avoid_terms = self.avoid_terms.split(',')
+        else:
+            logging.info('Retrieving spider arguments from Google Sheet')
+            my_sheet = SheetObj(self.auth_json, self.sheet_name)
 
-        # Get the accept threshold
-        self.accept_threshold = my_sheet.get_accept_threshold()
+            self.start_urls       = my_sheet.get_start_urls()
+            self.pages_visited    = self.start_urls
+            self.accept_threshold = my_sheet.get_accept_threshold()
+            self.max_page         = my_sheet.get_max_page()
+            self.search_terms     = my_sheet.get_search_terms()
+            self.avoid_terms      = my_sheet.get_avoid_terms()
+
+
         logging.info('Accept threshold: ' + str(self.accept_threshold))
-
-        # Get the max page depth
-        self.max_page = my_sheet.get_max_page()
         logging.info('Max "next page" link: ' + str(self.max_page))
-
-        # Grab our search terms from the Google Sheet
-        self.search_terms = my_sheet.get_search_terms()
-
-        # Grab terms to avoid from the Google Sheet
-        self.avoid_terms = my_sheet.get_avoid_terms()
 
         # Get the distinct stems of each word in our search and avoid terms
         stemmer = SnowballStemmer('english')
